@@ -2,6 +2,9 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 
+import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
+
 class AudioPlayerScreen extends StatefulWidget {
   final String filePath; // File path of the audio file to play
 
@@ -13,6 +16,7 @@ class AudioPlayerScreen extends StatefulWidget {
 
 class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   final AudioPlayer audioPlayer = AudioPlayer();
+  bool isPlaying = false;
 
   @override
   void initState() {
@@ -23,8 +27,22 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   Future<void> _playAudio() async {
     try {
       await audioPlayer.play(DeviceFileSource(widget.filePath));
+      setState(() {
+        isPlaying = true;
+      });
     } catch (e) {
       print('Error playing audio: $e');
+    }
+  }
+
+  Future<void> _pauseAudio() async {
+    try {
+      await audioPlayer.pause();
+      setState(() {
+        isPlaying = false;
+      });
+    } catch (e) {
+      print('Error pausing audio: $e');
     }
   }
 
@@ -45,10 +63,28 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text('Now Playing: ${widget.filePath}'), // Display file path or metadata
-            // Add playback controls here (play, pause, stop, etc.)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+                  onPressed: isPlaying ? _pauseAudio : _playAudio,
+                ),
+                IconButton(
+                  icon: Icon(Icons.stop),
+                  onPressed: () async {
+                    await audioPlayer.stop();
+                    setState(() {
+                      isPlaying = false;
+                    });
+                  },
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 }
+
