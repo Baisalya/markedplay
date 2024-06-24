@@ -1,12 +1,8 @@
-import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/material.dart';
-
-
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 class AudioPlayerScreen extends StatefulWidget {
-  final String filePath; // File path of the audio file to play
+  final String filePath;
 
   AudioPlayerScreen({required this.filePath});
 
@@ -17,19 +13,41 @@ class AudioPlayerScreen extends StatefulWidget {
 class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   final AudioPlayer audioPlayer = AudioPlayer();
   bool isPlaying = false;
+  Duration currentPosition = Duration.zero;
+  Duration totalDuration = Duration.zero;
+  List<Duration> marks = [];
 
   @override
   void initState() {
     super.initState();
-    _playAudio(); // Automatically start playing audio when screen initializes
+    _initAudioPlayer();
+  }
+
+  void _initAudioPlayer() {
+    audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
+      setState(() {
+        isPlaying = state == PlayerState.playing;
+      });
+    });
+
+    audioPlayer.onPositionChanged.listen((Duration position) {
+      setState(() {
+        currentPosition = position;
+      });
+    });
+
+    audioPlayer.onDurationChanged.listen((Duration duration) {
+      setState(() {
+        totalDuration = duration;
+      });
+    });
+
+    _playAudio();
   }
 
   Future<void> _playAudio() async {
     try {
       await audioPlayer.play(DeviceFileSource(widget.filePath));
-      setState(() {
-        isPlaying = true;
-      });
     } catch (e) {
       print('Error playing audio: $e');
     }
@@ -38,17 +56,28 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   Future<void> _pauseAudio() async {
     try {
       await audioPlayer.pause();
-      setState(() {
-        isPlaying = false;
-      });
     } catch (e) {
       print('Error pausing audio: $e');
     }
   }
 
+  Future<void> _seekAudio(Duration position) async {
+    try {
+      await audioPlayer.seek(position);
+    } catch (e) {
+      print('Error seeking audio: $e');
+    }
+  }
+
+  void _markPosition() {
+    setState(() {
+      marks.add(currentPosition);
+    });
+  }
+
   @override
   void dispose() {
-    audioPlayer.dispose(); // Dispose the audio player when screen is disposed
+    audioPlayer.dispose();
     super.dispose();
   }
 
@@ -62,24 +91,41 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Now Playing: ${widget.filePath}'), // Display file path or metadata
+            Text(
+              '${currentPosition.toString().split('.').first} / ${totalDuration.toString().split('.').first}',
+              style: TextStyle(fontSize: 24),
+            ),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                IconButton(
+                  icon: Icon(Icons.replay_10),
+                  onPressed: () => _seekAudio(currentPosition - Duration(seconds: 10)),
+                ),
                 IconButton(
                   icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
                   onPressed: isPlaying ? _pauseAudio : _playAudio,
                 ),
                 IconButton(
-                  icon: Icon(Icons.stop),
-                  onPressed: () async {
-                    await audioPlayer.stop();
-                    setState(() {
-                      isPlaying = false;
-                    });
-                  },
+                  icon: Icon(Icons.forward_10),
+                  onPressed: () => _seekAudio(currentPosition + Duration(seconds: 10)),
+                ),
+                IconButton(
+                  icon: Icon(Icons.flag),
+                  onPressed: _markPosition,
                 ),
               ],
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: marks.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(marks[index].toString().split('.').first),
+                    onTap: () => _seekAudio(marks[index]),
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -87,4 +133,3 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     );
   }
 }
-
