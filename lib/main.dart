@@ -6,6 +6,9 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:video_player/video_player.dart';
 import 'package:file_manager/file_manager.dart';
 
+import 'Audioplayer.dart';
+import 'Videoplayer.dart';
+
 void main() {
   runApp(MyApp());
 }
@@ -45,23 +48,34 @@ class _HomePageState extends State<HomePage> {
         controller: controller,
         builder: (context, snapshot) {
           final List<FileSystemEntity> entities = snapshot;
+          final List<FileSystemEntity> filteredEntities = entities.where((entity) {
+            if (FileManager.isDirectory(entity)) {
+              // Check if directory contains the selected file types
+              final directory = Directory(entity.path);
+              final List<FileSystemEntity> files = directory.listSync();
+              return files.any((file) {
+                if (_selectedIndex == 0) {
+                  return file.path.endsWith('.mp4') || file.path.endsWith('.avi');
+                } else {
+                  return file.path.endsWith('.mp3') || file.path.endsWith('.wav');
+                }
+              });
+            } else {
+              // Check if the file matches the selected file types
+              if (_selectedIndex == 0) {
+                return entity.path.endsWith('.mp4') || entity.path.endsWith('.avi');
+              } else {
+                return entity.path.endsWith('.mp3') || entity.path.endsWith('.wav');
+              }
+            }
+          }).toList();
+
           return ListView.builder(
             padding: EdgeInsets.symmetric(horizontal: 2, vertical: 0),
-            itemCount: entities.length,
+            itemCount: filteredEntities.length,
             itemBuilder: (context, index) {
-              FileSystemEntity entity = entities[index];
-              if (_selectedIndex == 0 && (entity.path.endsWith('.mp4') || entity.path.endsWith('.avi'))) {
-                // Show only video files
-                return fileListItem(entity);
-              } else if (_selectedIndex == 1 && (entity.path.endsWith('.mp3') || entity.path.endsWith('.wav'))) {
-                // Show only audio files
-                return fileListItem(entity);
-              } else if (FileManager.isDirectory(entity)) {
-                // Show directories
-                return fileListItem(entity);
-              } else {
-                return Container(); // Hide other files
-              }
+              FileSystemEntity entity = filteredEntities[index];
+              return fileListItem(entity);
             },
           );
         },
@@ -254,191 +268,6 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class AudioPlayerScreen extends StatefulWidget {
-  final String filePath;
 
-  AudioPlayerScreen({required this.filePath});
 
-  @override
-  _AudioPlayerScreenState createState() => _AudioPlayerScreenState();
-}
 
-class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
-  final AudioPlayer audioPlayer = AudioPlayer();
-  bool isPlaying = false;
-  Duration currentPosition = Duration.zero;
-  Duration totalDuration = Duration.zero;
-  List<Duration> marks = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _initAudioPlayer();
-  }
-
-  void _initAudioPlayer() {
-    audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
-      setState(() {
-        isPlaying = state == PlayerState.playing;
-      });
-    });
-
-    audioPlayer.onPositionChanged.listen((Duration position) {
-      setState(() {
-        currentPosition = position;
-      });
-    });
-
-    audioPlayer.onDurationChanged.listen((Duration duration) {
-      setState(() {
-        totalDuration = duration;
-      });
-    });
-
-    _playAudio();
-  }
-
-  Future<void> _playAudio() async {
-    try {
-      await audioPlayer.play(DeviceFileSource(widget.filePath));
-    } catch (e) {
-      print('Error playing audio: $e');
-    }
-  }
-
-  Future<void> _pauseAudio() async {
-    try {
-      await audioPlayer.pause();
-    } catch (e) {
-      print('Error pausing audio: $e');
-    }
-  }
-
-  Future<void> _seekAudio(Duration position) async {
-    try {
-      await audioPlayer.seek(position);
-    } catch (e) {
-      print('Error seeking audio: $e');
-    }
-  }
-
-  void _markPosition() {
-    setState(() {
-      marks.add(currentPosition);
-    });
-  }
-
-  @override
-  void dispose() {
-    audioPlayer.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Audio Player'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '${currentPosition.toString().split('.').first} / ${totalDuration.toString().split('.').first}',
-              style: TextStyle(fontSize: 24),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.replay_10),
-                  onPressed: () => _seekAudio(currentPosition - Duration(seconds: 10)),
-                ),
-                IconButton(
-                  icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-                  onPressed: isPlaying ? _pauseAudio : _playAudio,
-                ),
-                IconButton(
-                  icon: Icon(Icons.forward_10),
-                  onPressed: () => _seekAudio(currentPosition + Duration(seconds: 10)),
-                ),
-                IconButton(
-                  icon: Icon(Icons.flag),
-                  onPressed: _markPosition,
-                ),
-              ],
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: marks.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(marks[index].toString().split('.').first),
-                    onTap: () => _seekAudio(marks[index]),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class VideoPlayerScreen extends StatefulWidget {
-  final String filePath;
-
-  VideoPlayerScreen({required this.filePath});
-
-  @override
-  _VideoPlayerScreenState createState() => _VideoPlayerScreenState();
-}
-
-class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late VideoPlayerController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.file(File(widget.filePath))
-      ..initialize().then((_) {
-        setState(() {});
-        _controller.play();
-      });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Video Player'),
-      ),
-      body: Center(
-        child: _controller.value.isInitialized
-            ? AspectRatio(
-          aspectRatio: _controller.value.aspectRatio,
-          child: VideoPlayer(_controller),
-        )
-            : CircularProgressIndicator(),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          setState(() {
-            _controller.value.isPlaying ? _controller.pause() : _controller.play();
-          });
-        },
-        child: Icon(
-          _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-        ),
-      ),
-    );
-  }
-}
