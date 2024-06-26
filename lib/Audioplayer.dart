@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
+import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 class AudioPlayerScreen extends StatefulWidget {
   final String filePath;
 
@@ -20,6 +24,8 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    _loadMarks();
+    _loadLastPlayedPosition();
     _initAudioPlayer();
   }
 
@@ -73,10 +79,41 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     setState(() {
       marks.add(currentPosition);
     });
+    _saveMarks();
+  }
+
+  Future<void> _saveMarks() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> marksString = marks.map((duration) => duration.inSeconds.toString()).toList();
+    await prefs.setStringList('marks_${widget.filePath}', marksString);
+  }
+
+  Future<void> _loadMarks() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String>? marksString = prefs.getStringList('marks_${widget.filePath}');
+    if (marksString != null) {
+      setState(() {
+        marks = marksString.map((mark) => Duration(seconds: int.parse(mark))).toList();
+      });
+    }
+  }
+
+  Future<void> _saveLastPlayedPosition() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('lastPlayedPosition_${widget.filePath}', currentPosition.inSeconds);
+  }
+
+  Future<void> _loadLastPlayedPosition() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    int? lastPlayedPosition = prefs.getInt('lastPlayedPosition_${widget.filePath}');
+    if (lastPlayedPosition != null) {
+      await audioPlayer.seek(Duration(seconds: lastPlayedPosition));
+    }
   }
 
   @override
   void dispose() {
+    _saveLastPlayedPosition();
     audioPlayer.dispose();
     super.dispose();
   }
@@ -133,3 +170,4 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     );
   }
 }
+

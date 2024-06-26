@@ -45,6 +45,10 @@ dependencies:
   video_player:
   file_manager:
   flutter_audio_waveforms:
+  shared_preferences:
+
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

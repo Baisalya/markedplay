@@ -1,7 +1,7 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String filePath;
@@ -14,19 +14,37 @@ class VideoPlayerScreen extends StatefulWidget {
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late VideoPlayerController _controller;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _controller = VideoPlayerController.file(File(widget.filePath))
       ..initialize().then((_) {
-        setState(() {});
+        setState(() {
+          _isInitialized = true;
+        });
+        _loadLastPlayedPosition();
         _controller.play();
       });
   }
 
+  Future<void> _saveLastPlayedPosition() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('lastPlayedPosition_${widget.filePath}', _controller.value.position.inSeconds);
+  }
+
+  Future<void> _loadLastPlayedPosition() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    int? lastPlayedPosition = prefs.getInt('lastPlayedPosition_${widget.filePath}');
+    if (lastPlayedPosition != null) {
+      _controller.seekTo(Duration(seconds: lastPlayedPosition));
+    }
+  }
+
   @override
   void dispose() {
+    _saveLastPlayedPosition();
     _controller.dispose();
     super.dispose();
   }
@@ -38,7 +56,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         title: Text('Video Player'),
       ),
       body: Center(
-        child: _controller.value.isInitialized
+        child: _isInitialized
             ? AspectRatio(
           aspectRatio: _controller.value.aspectRatio,
           child: VideoPlayer(_controller),
