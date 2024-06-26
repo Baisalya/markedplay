@@ -1,4 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:video_player/video_player.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
@@ -15,6 +26,7 @@ class VideoPlayerScreen extends StatefulWidget {
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late VideoPlayerController _controller;
   bool _isInitialized = false;
+  bool _isFullScreen = false;
 
   @override
   void initState() {
@@ -49,30 +61,81 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.dispose();
   }
 
+  void _toggleFullScreen() {
+    setState(() {
+      _isFullScreen = !_isFullScreen;
+    });
+    if (_isFullScreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: _isFullScreen ? null : AppBar(
         title: Text('Video Player'),
       ),
-      body: Center(
-        child: _isInitialized
-            ? AspectRatio(
-          aspectRatio: _controller.value.aspectRatio,
-          child: VideoPlayer(_controller),
-        )
-            : CircularProgressIndicator(),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          setState(() {
-            _controller.value.isPlaying ? _controller.pause() : _controller.play();
-          });
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Center(
+            child: _isInitialized
+                ? Column(
+              children: [
+                GestureDetector(
+                  onTap: _toggleFullScreen,
+                  child: Container(
+                    width: constraints.maxWidth,
+                    height: _isFullScreen ? constraints.maxHeight : constraints.maxWidth * (9 / 16),
+                    child: VideoPlayer(_controller),
+                  ),
+                ),
+                if (!_isFullScreen)
+                  VideoProgressIndicator(
+                    _controller,
+                    allowScrubbing: true,
+                    padding: EdgeInsets.all(10.0),
+                  ),
+              ],
+            )
+                : CircularProgressIndicator(),
+          );
         },
-        child: Icon(
-          _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-        ),
       ),
+      floatingActionButton: !_isFullScreen
+          ? Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: () {
+              setState(() {
+                _controller.value.isPlaying ? _controller.pause() : _controller.play();
+              });
+            },
+            child: Icon(
+              _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+            ),
+          ),
+          SizedBox(width: 10),
+          FloatingActionButton(
+            onPressed: _toggleFullScreen,
+            child: Icon(_isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen),
+          ),
+        ],
+      )
+          : null,
     );
   }
 }
+
+
