@@ -1,47 +1,24 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:audioplayers/audioplayers.dart';
-import 'package:video_player/video_player.dart';
+
 import 'package:file_manager/file_manager.dart';
+import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-import 'Audioplayer.dart';
-import 'Pages/HomePage.dart';
-import 'Pages/videoplayer/Videoplayer.dart';
+import '../Audioplayer.dart';
+import 'videoplayer/Videoplayer.dart';
+import '../controller/FileManagerController.dart';
 
-void main() {
-  runApp(MyApp());
-}
 
-class MyApp extends StatefulWidget {
-  @override
-  _MyAppState createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
-      theme: ThemeData(useMaterial3: true),
-      darkTheme: ThemeData(useMaterial3: true, brightness: Brightness.dark),
-      home: HomePage(),
-    );
-  }
-}
-
-/*class HomePage extends StatefulWidget {
+class HomePage extends StatefulWidget {
   @override
   _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  final FileManagerController controller = FileManagerController();
+  final FilemanagerController fileManagerController = FilemanagerController();
   int _selectedIndex = 0;
   bool isGridView = false;
-  late final List<String> filePaths;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -80,13 +57,13 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
       title: ValueListenableBuilder<String>(
-        valueListenable: controller.titleNotifier,
+        valueListenable: fileManagerController.title,
         builder: (context, title, _) => Text(title),
       ),
       leading: IconButton(
         icon: Icon(Icons.arrow_back),
         onPressed: () async {
-          await controller.goToParentDirectory();
+          await fileManagerController.goToParentDirectory();
         },
       ),
     );
@@ -94,7 +71,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildFileManager() {
     return FileManager(
-      controller: controller,
+      controller: fileManagerController.controller,
       builder: (context, snapshot) {
         final List<FileSystemEntity> entities = snapshot;
         final List<FileSystemEntity> filteredEntities = _filterEntities(entities);
@@ -103,7 +80,6 @@ class _HomePageState extends State<HomePage> {
       },
     );
   }
-
 
   List<FileSystemEntity> _filterEntities(List<FileSystemEntity> entities) {
     return entities.where((entity) {
@@ -177,7 +153,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
   Widget _buildThumbnail(FileSystemEntity entity) {
     if (FileManager.isDirectory(entity)) {
       return Icon(Icons.folder);
@@ -208,7 +183,7 @@ class _HomePageState extends State<HomePage> {
   void _onFileTap(FileSystemEntity entity) {
     if (FileManager.isDirectory(entity)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        controller.openDirectory(entity);
+        fileManagerController.openDirectory(entity);
       });
     } else {
       if (entity.path.endsWith('.mp3') || entity.path.endsWith('.wav')) {
@@ -228,7 +203,6 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-
 
   BottomNavigationBar _buildBottomNavigationBar() {
     return BottomNavigationBar(
@@ -254,9 +228,7 @@ class _HomePageState extends State<HomePage> {
   FloatingActionButton _buildFloatingActionButton() {
     return FloatingActionButton.extended(
       onPressed: () async {
-        FileManager.requestFilesAccessPermission();
-        await Permission.storage.request();
-        await Permission.manageExternalStorage.request();
+        FilemanagerController.requestFilesAccessPermission();
       },
       label: Text("Request File Access Permission"),
     );
@@ -267,7 +239,7 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (context) => Dialog(
         child: FutureBuilder<List<Directory>>(
-          future: FileManager.getStorageList(),
+          future: FilemanagerController.getStorageList(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.done) {
               if (snapshot.hasData) {
@@ -280,7 +252,7 @@ class _HomePageState extends State<HomePage> {
                       title: Text("${FileManager.basename(e)}"),
                       onTap: () {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
-                          controller.openDirectory(e);
+                          fileManagerController.openDirectory(e);
                           Navigator.pop(context);
                         });
                       },
@@ -298,8 +270,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
-
   Future<void> _sortFiles(BuildContext context) async {
     showDialog(
       context: context,
@@ -312,25 +282,25 @@ class _HomePageState extends State<HomePage> {
               ListTile(
                   title: Text("Name"),
                   onTap: () {
-                    controller.sortBy(SortBy.name);
+                    fileManagerController.sortBy(SortBy.name);
                     Navigator.pop(context);
                   }),
               ListTile(
                   title: Text("Size"),
                   onTap: () {
-                    controller.sortBy(SortBy.size);
+                    fileManagerController.sortBy(SortBy.size);
                     Navigator.pop(context);
                   }),
               ListTile(
                   title: Text("Date"),
                   onTap: () {
-                    controller.sortBy(SortBy.date);
+                    fileManagerController.sortBy(SortBy.date);
                     Navigator.pop(context);
                   }),
               ListTile(
                   title: Text("Type"),
                   onTap: () {
-                    controller.sortBy(SortBy.type);
+                    fileManagerController.sortBy(SortBy.type);
                     Navigator.pop(context);
                   }),
             ],
@@ -339,8 +309,4 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-}*/
-
-
-
-
+}

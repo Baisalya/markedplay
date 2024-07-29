@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
-
+import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -121,53 +120,118 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text('Audio Player'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '${currentPosition.toString().split('.').first} / ${totalDuration.toString().split('.').first}',
-              style: TextStyle(fontSize: 24),
+      body: Stack(
+        children: [
+          // Background image with blur effect
+          Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: File(widget.filePath).existsSync()
+                    ? FileImage(File(widget.filePath))
+                    : AssetImage('assets/music1.jpg') as ImageProvider,
+                fit: BoxFit.cover,
+              ),
             ),
-            Row(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+              child: Container(
+                color: Colors.black.withOpacity(0.5),
+              ),
+            ),
+          ),
+          Center(
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  icon: Icon(Icons.replay_10),
-                  onPressed: () => _seekAudio(currentPosition - Duration(seconds: 10)),
+                // Album Art
+                Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: File(widget.filePath).existsSync()
+                          ? FileImage(File(widget.filePath))
+                          : AssetImage('assets/default_album_art.jpg') as ImageProvider,
+                      fit: BoxFit.cover,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                 ),
-                IconButton(
-                  icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-                  onPressed: isPlaying ? _pauseAudio : _playAudio,
+                SizedBox(height: 20),
+                // Song title
+                Text(
+                  getSongName(widget.filePath),
+                  style: TextStyle(fontSize: 24, color: Colors.white),
                 ),
-                IconButton(
-                  icon: Icon(Icons.forward_10),
-                  onPressed: () => _seekAudio(currentPosition + Duration(seconds: 10)),
+                Text(
+                  'The Strokes',
+                  style: TextStyle(fontSize: 18, color: Colors.white70),
                 ),
-                IconButton(
-                  icon: Icon(Icons.flag),
-                  onPressed: _markPosition,
+                SizedBox(height: 20),
+                // Current position and total duration
+                Text(
+                  '${currentPosition.toString().split('.').first} / ${totalDuration.toString().split('.').first}',
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
+                SizedBox(height: 20),
+                // Audio controls
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.replay_10, color: Colors.white),
+                      onPressed: () => _seekAudio(currentPosition - Duration(seconds: 10)),
+                    ),
+                    IconButton(
+                      icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
+                      onPressed: isPlaying ? _pauseAudio : _playAudio,
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.forward_10, color: Colors.white),
+                      onPressed: () => _seekAudio(currentPosition + Duration(seconds: 10)),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.flag, color: Colors.white),
+                      onPressed: _markPosition,
+                    ),
+                  ],
+                ),
+                // List of marks
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: marks.length,
+                    itemBuilder: (context, index) {
+                      return ListTile(
+                        title: Text(
+                          marks[index].toString().split('.').first,
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        onTap: () => _seekAudio(marks[index]),
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: marks.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(marks[index].toString().split('.').first),
-                    onTap: () => _seekAudio(marks[index]),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-}
 
+  String getSongName(String filePath) {
+    return filePath.split('/').last.split('.').first;
+  }
+
+}
