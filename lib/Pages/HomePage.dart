@@ -8,6 +8,41 @@ import '../Audioplayer.dart';
 import 'videoplayer/Videoplayer.dart';
 import '../controller/FileManagerController.dart';
 
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:file_manager/file_manager.dart';
+import 'package:permission_handler/permission_handler.dart';
+class FilemanagerController {
+  final ValueNotifier<String> titleNotifier = ValueNotifier<String>("Home");
+  final FileManagerController _fileManagerController = FileManagerController();
+
+  ValueNotifier<String> get title => titleNotifier;
+
+  FileManagerController get controller => _fileManagerController;
+
+  void openDirectory(FileSystemEntity entity) {
+    _fileManagerController.openDirectory(entity);
+  }
+
+  Future<void> goToParentDirectory() async {
+    await _fileManagerController.goToParentDirectory();
+  }
+
+  void sortBy(SortBy sortBy) {
+    _fileManagerController.sortBy(sortBy);
+  }
+
+  static Future<List<Directory>> getStorageList() async {
+    return FileManager.getStorageList();
+  }
+
+  static Future<bool> requestFilesAccessPermission() async {
+    var storageStatus = await Permission.storage.request();
+    var manageStorageStatus = await Permission.manageExternalStorage.request();
+    return storageStatus.isGranted && manageStorageStatus.isGranted;
+  }
+}
 
 class HomePage extends StatefulWidget {
   @override
@@ -18,16 +53,42 @@ class _HomePageState extends State<HomePage> {
   final FilemanagerController fileManagerController = FilemanagerController();
   int _selectedIndex = 0;
   bool isGridView = false;
+  bool hasFileAccessPermission = false;
+  String? lastPlayedVideoPath;
+  String? lastPlayedMusicPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFileAccessPermission();
+  }
+
+  Future<void> _checkFileAccessPermission() async {
+    bool granted = await FilemanagerController.requestFilesAccessPermission();
+    setState(() {
+      hasFileAccessPermission = granted;
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _appBar(context),
-      body: _buildFileManager(),
+      body: Stack(
+        children: [
+          _buildFileManager(),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: MiniPlayer(), // Add the MiniPlayer here
+          ),
+        ],
+      ),
       bottomNavigationBar: _buildBottomNavigationBar(),
-      floatingActionButton: _buildFloatingActionButton(),
+      floatingActionButton: _buildFloatingActionButton(), // This is placed above MiniPlayer
     );
   }
+
 
   AppBar _appBar(BuildContext context) {
     return AppBar(
@@ -40,6 +101,13 @@ class _HomePageState extends State<HomePage> {
           onPressed: () => _selectStorage(context),
           icon: Icon(Icons.sd_storage_rounded),
         ),
+        if (hasFileAccessPermission) // Add this line
+          IconButton(
+            onPressed: () {
+              // Handle permission-related action
+            },
+            icon: Icon(Icons.check_circle), // Use an appropriate icon
+          ),
         PopupMenuButton<String>(
           onSelected: (value) {
             setState(() {
@@ -187,6 +255,7 @@ class _HomePageState extends State<HomePage> {
       });
     } else {
       if (entity.path.endsWith('.mp3') || entity.path.endsWith('.wav')) {
+        lastPlayedMusicPath = entity.path;
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -194,6 +263,7 @@ class _HomePageState extends State<HomePage> {
           ),
         );
       } else if (entity.path.endsWith('.mp4') || entity.path.endsWith('.avi')) {
+        lastPlayedVideoPath = entity.path;
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -226,87 +296,100 @@ class _HomePageState extends State<HomePage> {
   }
 
   FloatingActionButton _buildFloatingActionButton() {
-    return FloatingActionButton.extended(
-      onPressed: () async {
-        FilemanagerController.requestFilesAccessPermission();
+    return FloatingActionButton(
+      onPressed: () {
+        if (_selectedIndex == 0 && lastPlayedVideoPath != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoPlayerScreen(filePath: lastPlayedVideoPath!),
+            ),
+          );
+        } else if (_selectedIndex == 1 && lastPlayedMusicPath != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AudioPlayerScreen(filePath: lastPlayedMusicPath!),
+            ),
+          );
+        }
       },
-      label: Text("Request File Access Permission"),
+      child: Icon(Icons.play_arrow),
     );
   }
 
   Future<void> _selectStorage(BuildContext context) async {
     return showDialog(
       context: context,
-      builder: (context) => Dialog(
-        child: FutureBuilder<List<Directory>>(
-          future: FilemanagerController.getStorageList(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.done) {
-              if (snapshot.hasData) {
-                final List<FileSystemEntity> storageList = snapshot.data!;
-                return Padding(
-                  padding: const EdgeInsets.all(10.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: storageList.map((e) => ListTile(
-                      title: Text("${FileManager.basename(e)}"),
-                      onTap: () {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          fileManagerController.openDirectory(e);
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: Container(
+            width: double.maxFinite,
+            height: 200,
+            child: FutureBuilder<List<Directory>>(
+              future: FilemanagerController.getStorageList(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done) {
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: snapshot.data?.length ?? 0,
+                    itemBuilder: (context, index) {
+                      return ListTile(
+                        title: Text(snapshot.data![index].path),
+                        onTap: () {
+                          fileManagerController.openDirectory(snapshot.data![index]);
                           Navigator.pop(context);
-                        });
-                      },
-                    )).toList(),
-                  ),
-                );
-              } else if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
-              }
-            }
-            return Center(child: CircularProgressIndicator());
-          },
-        ),
-      ),
+                        },
+                      );
+                    },
+                  );
+                } else {
+                  return Center(child: CircularProgressIndicator());
+                }
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 
   Future<void> _sortFiles(BuildContext context) async {
-    showDialog(
+    return showDialog(
       context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          padding: EdgeInsets.all(10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                  title: Text("Name"),
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: Container(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: Text("By Name"),
                   onTap: () {
                     fileManagerController.sortBy(SortBy.name);
                     Navigator.pop(context);
-                  }),
-              ListTile(
-                  title: Text("Size"),
-                  onTap: () {
-                    fileManagerController.sortBy(SortBy.size);
-                    Navigator.pop(context);
-                  }),
-              ListTile(
-                  title: Text("Date"),
+                  },
+                ),
+                ListTile(
+                  title: Text("By Date"),
                   onTap: () {
                     fileManagerController.sortBy(SortBy.date);
                     Navigator.pop(context);
-                  }),
-              ListTile(
-                  title: Text("Type"),
+                  },
+                ),
+                ListTile(
+                  title: Text("By Size"),
                   onTap: () {
-                    fileManagerController.sortBy(SortBy.type);
+                    fileManagerController.sortBy(SortBy.size);
                     Navigator.pop(context);
-                  }),
-            ],
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

@@ -5,11 +5,19 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'Pages/Feature/Scrolltext.dart';
-
-import 'package:flutter/material.dart';
 import 'dart:io';
 import 'dart:ui';
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'dart:io';
+import 'dart:ui';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class AudioPlayerScreen extends StatefulWidget {
   final String filePath;
@@ -21,16 +29,20 @@ class AudioPlayerScreen extends StatefulWidget {
 }
 
 class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTickerProviderStateMixin {
-  late AudioPlayerController _controller;
   late AnimationController _animationController;
+  List<String> _backgroundImages = [
+    'assets/songbg/Beautifulsky.jpg',
+    'assets/songbg/Colorful Leaves with Water Droplets Aesthetic Nature (57) - 480x857.JPG',
+    'assets/songbg/Evening Beach Aesthetic Calm and Relaxing Sea Waves (245) - 2000x3569.JPG',
+    'assets/songbg/Evening Beach Aesthetic Calm and Relaxing Sea Waves (659) - 2000x3569.JPG',
+  ];
+  int _currentBackgroundIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _controller = AudioPlayerController();
-    _controller.loadMarks(widget.filePath, setState);
-    _controller.loadLastPlayedPosition(widget.filePath);
-    _controller.initAudioPlayer(setState, widget.filePath);
+    final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+    audioProvider.playAudio(widget.filePath);
 
     _animationController = AnimationController(
       vsync: this,
@@ -40,13 +52,20 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
 
   @override
   void dispose() {
-    _controller.dispose(widget.filePath);
     _animationController.dispose();
     super.dispose();
   }
 
+  void _changeBackgroundImage() {
+    setState(() {
+      _currentBackgroundIndex = (_currentBackgroundIndex + 1) % _backgroundImages.length;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final audioProvider = Provider.of<AudioPlayerProvider>(context);
+
     return SafeArea(
       child: Scaffold(
         extendBodyBehindAppBar: true,
@@ -59,6 +78,26 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
               Navigator.of(context).pop();
             },
           ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.image, color: Colors.white),
+              onPressed: _changeBackgroundImage,
+            ),
+            PopupMenuButton<String>(
+              onSelected: (String value) {
+                audioProvider.setLoopMode(value);
+              },
+              itemBuilder: (BuildContext context) {
+                return {'Loop One', 'Loop All', 'No Loop'}.map((String choice) {
+                  return PopupMenuItem<String>(
+                    value: choice,
+                    child: Text(choice),
+                  );
+                }).toList();
+              },
+              icon: Icon(Icons.loop, color: Colors.white),
+            ),
+          ],
         ),
         body: Stack(
           children: [
@@ -66,7 +105,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
             Container(
               decoration: BoxDecoration(
                 image: DecorationImage(
-                  image: AssetImage('assets/songbg/Beautifulsky.jpg'),
+                  image: AssetImage(_backgroundImages[_currentBackgroundIndex]),
                   fit: BoxFit.cover,
                 ),
               ),
@@ -88,26 +127,62 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
                         // Animated Album Art in a disc-shaped container
                         RotationTransition(
                           turns: _animationController,
-                          child: Container(
-                            width: 200,
-                            height: 200,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              image: DecorationImage(
-                                image: File(widget.filePath).existsSync()
-                                    ? FileImage(File(widget.filePath))
-                                    : AssetImage('assets/images.jpg') as ImageProvider,
-                                fit: BoxFit.cover,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.5),
-                                  spreadRadius: 5,
-                                  blurRadius: 10,
-                                  offset: Offset(0, 3),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Large circular container with the asset image
+                              Container(
+                                width: 200,
+                                height: 200,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  image: DecorationImage(
+                                    image: AssetImage('assets/songbg/vinylmusic.png'),
+                                    fit: BoxFit.cover,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.5),
+                                      spreadRadius: 5,
+                                      blurRadius: 10,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              // Small circular container with the file image
+                              if (File(widget.filePath).existsSync())
+                                Container(
+                                  width: 100,
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2), // Optional border for visibility
+                                    image: DecorationImage(
+                                      image: FileImage(File(widget.filePath)),
+                                      fit: BoxFit.cover,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.5),
+                                        spreadRadius: 5,
+                                        blurRadius: 10,
+                                        offset: Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              // Blank circular container
+                              Container(
+                                width: 15,
+                                height: 15,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.transparent,
+                                  border: Border.all(color: Colors.white, width: 2), // Optional border for visibility
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         SizedBox(height: 30),
@@ -134,14 +209,14 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
                         SizedBox(height: 30),
                         // Current position and total duration
                         Text(
-                          '${_controller.currentPosition.toString().split('.').first} / ${_controller.totalDuration.toString().split('.').first}',
+                          '${audioProvider.currentPosition.toString().split('.').first} / ${audioProvider.totalDuration.toString().split('.').first}',
                           style: TextStyle(fontSize: 18, color: Colors.white70),
                         ),
                         Slider(
-                          value: _controller.currentPosition.inSeconds.toDouble(),
-                          max: _controller.totalDuration.inSeconds.toDouble(),
+                          value: audioProvider.currentPosition.inSeconds.toDouble(),
+                          max: audioProvider.totalDuration.inSeconds.toDouble(),
                           onChanged: (value) {
-                            _controller.seekAudio(Duration(seconds: value.toInt()));
+                            audioProvider.seekAudio(Duration(seconds: value.toInt()));
                           },
                           activeColor: Colors.white,
                           inactiveColor: Colors.white30,
@@ -155,22 +230,22 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
                             IconButton(
                               icon: Icon(Icons.replay_10, color: Colors.white),
                               iconSize: 30,
-                              onPressed: () => _controller.seekAudio(_controller.currentPosition - Duration(seconds: 10)),
+                              onPressed: () => audioProvider.seekAudio(audioProvider.currentPosition - Duration(seconds: 10)),
                             ),
                             IconButton(
-                              icon: Icon(_controller.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
+                              icon: Icon(audioProvider.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
                               iconSize: 30,
-                              onPressed: _controller.isPlaying ? _controller.pauseAudio : () => _controller.playAudio(widget.filePath),
+                              onPressed: () => audioProvider.playAudio(widget.filePath),
                             ),
                             IconButton(
                               icon: Icon(Icons.forward_10, color: Colors.white),
                               iconSize: 30,
-                              onPressed: () => _controller.seekAudio(_controller.currentPosition + Duration(seconds: 10)),
+                              onPressed: () => audioProvider.seekAudio(audioProvider.currentPosition + Duration(seconds: 10)),
                             ),
                             IconButton(
                               icon: Icon(Icons.flag, color: Colors.white),
                               iconSize: 30,
-                              onPressed: () => _controller.markPosition(setState, widget.filePath),
+                              onPressed: () => audioProvider.markPosition(widget.filePath),
                             ),
                           ],
                         ),
@@ -178,14 +253,14 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
                         // List of marks
                         Expanded(
                           child: ListView.builder(
-                            itemCount: _controller.marks.length,
+                            itemCount: audioProvider.marks.length,
                             itemBuilder: (context, index) {
                               return ListTile(
                                 title: Text(
-                                  _controller.marks[index].toString().split('.').first,
+                                  audioProvider.marks[index].toString().split('.').first,
                                   style: TextStyle(color: Colors.white),
                                 ),
-                                onTap: () => _controller.seekAudio(_controller.marks[index]),
+                                onTap: () => audioProvider.seekAudio(audioProvider.marks[index]),
                               );
                             },
                           ),
@@ -198,6 +273,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
             ),
           ],
         ),
+        bottomSheet: MiniPlayer(),
       ),
     );
   }
@@ -207,97 +283,119 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
   }
 }
 
-class AudioPlayerController {
+
+
+class AudioPlayerProvider with ChangeNotifier {
   final AudioPlayer audioPlayer = AudioPlayer();
   bool isPlaying = false;
   Duration currentPosition = Duration.zero;
   Duration totalDuration = Duration.zero;
   List<Duration> marks = [];
+  String loopMode = 'No Loop';
+  String? currentFilePath;
 
-  void initAudioPlayer(void Function(void Function()) setState, String filePath) {
+  AudioPlayerProvider() {
     audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
-      setState(() {
-        isPlaying = state == PlayerState.playing;
-      });
+      isPlaying = state == PlayerState.playing;
+      notifyListeners();
     });
 
     audioPlayer.onPositionChanged.listen((Duration position) {
-      setState(() {
-        currentPosition = position;
-      });
+      currentPosition = position;
+      notifyListeners();
     });
 
     audioPlayer.onDurationChanged.listen((Duration duration) {
-      setState(() {
-        totalDuration = duration;
-      });
+      totalDuration = duration;
+      notifyListeners();
     });
 
-    playAudio(filePath);
+    audioPlayer.onPlayerComplete.listen((_) {
+      if (loopMode == 'Loop One') {
+        playAudio(currentFilePath!);
+      } else if (loopMode == 'Loop All') {
+        // handle loop all
+      } else {
+        isPlaying = false;
+        notifyListeners();
+      }
+    });
   }
 
   Future<void> playAudio(String filePath) async {
-    try {
+    if (isPlaying && currentFilePath == filePath) {
+      await audioPlayer.pause();
+      isPlaying = false;
+    } else {
+      currentFilePath = filePath;
       await audioPlayer.play(DeviceFileSource(filePath));
-    } catch (e) {
-      print('Error playing audio: $e');
+      isPlaying = true;
     }
+    notifyListeners();
   }
 
   Future<void> pauseAudio() async {
-    try {
-      await audioPlayer.pause();
-    } catch (e) {
-      print('Error pausing audio: $e');
-    }
+    await audioPlayer.pause();
+    isPlaying = false;
+    notifyListeners();
   }
 
   Future<void> seekAudio(Duration position) async {
-    try {
-      await audioPlayer.seek(position);
-    } catch (e) {
-      print('Error seeking audio: $e');
-    }
+    await audioPlayer.seek(position);
+    notifyListeners();
   }
 
-  void markPosition(void Function(void Function()) setState, String filePath) {
-    setState(() {
-      marks.add(currentPosition);
-    });
-    saveMarks(filePath);
+  void setLoopMode(String mode) {
+    loopMode = mode;
+    notifyListeners();
   }
 
-  Future<void> saveMarks(String filePath) async {
+  Future<void> markPosition(String filePath) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String> marksString = marks.map((duration) => duration.inSeconds.toString()).toList();
-    await prefs.setStringList('marks_$filePath', marksString);
+    String marksKey = '$filePath-marks';
+    List<String>? marksList = prefs.getStringList(marksKey);
+    marks = marksList?.map((mark) => Duration(seconds: int.parse(mark))).toList() ?? [];
+    notifyListeners();
   }
+}
 
-  Future<void> loadMarks(String filePath, void Function(void Function()) setState) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String>? marksString = prefs.getStringList('marks_$filePath');
-    if (marksString != null) {
-      setState(() {
-        marks = marksString.map((mark) => Duration(seconds: int.parse(mark))).toList();
-      });
-    }
-  }
+class MiniPlayer extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final audioProvider = Provider.of<AudioPlayerProvider>(context);
 
-  Future<void> saveLastPlayedPosition(String filePath) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('lastPlayedPosition_$filePath', currentPosition.inSeconds);
-  }
-
-  Future<void> loadLastPlayedPosition(String filePath) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    int? lastPlayedPosition = prefs.getInt('lastPlayedPosition_$filePath');
-    if (lastPlayedPosition != null) {
-      await audioPlayer.seek(Duration(seconds: lastPlayedPosition));
-    }
-  }
-
-  void dispose(String filePath) {
-    saveLastPlayedPosition(filePath);
-    audioPlayer.dispose();
+    return audioProvider.currentFilePath == null
+        ? SizedBox.shrink()
+        : Container(
+      color: Colors.black54,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Now Playing: ${audioProvider.currentFilePath!.split('/').last}',
+            style: TextStyle(color: Colors.white),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: Icon(audioProvider.isPlaying ? Icons.pause : Icons.play_arrow),
+                color: Colors.white,
+                onPressed: () {
+                  audioProvider.playAudio(audioProvider.currentFilePath!);
+                },
+              ),
+              IconButton(
+                icon: Icon(Icons.close),
+                color: Colors.white,
+                onPressed: () {
+                  audioProvider.pauseAudio();
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

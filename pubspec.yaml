@@ -49,6 +49,7 @@ dependencies:
   screen_brightness:
   volume_control:
   marquee:
+  provider:
 dev_dependencies:
   flutter_test:
     sdk: flutter
