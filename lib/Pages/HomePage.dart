@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_manager/file_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 
 import '../Audioplayer.dart';
 import 'videoplayer/Videoplayer.dart';
@@ -70,7 +71,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,16 +78,18 @@ class _HomePageState extends State<HomePage> {
       body: Stack(
         children: [
           _buildFileManager(),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: MiniPlayer(), // Add the MiniPlayer here
-          ),
+          if (lastPlayedMusicPath != null) // Add this condition
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: MiniPlayer(), // Add the MiniPlayer here
+            ),
         ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
       floatingActionButton: _buildFloatingActionButton(), // This is placed above MiniPlayer
     );
   }
+
 
 
   AppBar _appBar(BuildContext context) {
@@ -259,7 +261,10 @@ class _HomePageState extends State<HomePage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => AudioPlayerScreen(filePath: entity.path),
+            builder: (context) => AudioPlayerScreen(
+              filePath: entity.path,
+              startPosition: Duration.zero, // Start from the beginning
+            ),
           ),
         );
       } else if (entity.path.endsWith('.mp4') || entity.path.endsWith('.avi')) {
@@ -309,7 +314,10 @@ class _HomePageState extends State<HomePage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => AudioPlayerScreen(filePath: lastPlayedMusicPath!),
+              builder: (context) => AudioPlayerScreen(
+                filePath: lastPlayedMusicPath!,
+                startPosition: Provider.of<AudioPlayerProvider>(context, listen: false).currentPosition,
+              ),
             ),
           );
         }

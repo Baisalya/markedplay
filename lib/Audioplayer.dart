@@ -18,11 +18,11 @@ import 'package:provider/provider.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 class AudioPlayerScreen extends StatefulWidget {
   final String filePath;
+  final Duration startPosition;
 
-  AudioPlayerScreen({required this.filePath});
+  AudioPlayerScreen({required this.filePath, required this.startPosition});
 
   @override
   _AudioPlayerScreenState createState() => _AudioPlayerScreenState();
@@ -42,7 +42,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
   void initState() {
     super.initState();
     final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
-    audioProvider.playAudio(widget.filePath);
+    audioProvider.playAudio(widget.filePath, startPosition: widget.startPosition);
 
     _animationController = AnimationController(
       vsync: this,
@@ -245,7 +245,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
                             IconButton(
                               icon: Icon(Icons.flag, color: Colors.white),
                               iconSize: 30,
-                              onPressed: () => audioProvider.markPosition(widget.filePath),
+                              onPressed: () {
+                                audioProvider.markPosition(widget.filePath);
+                              },
                             ),
                           ],
                         ),
@@ -260,7 +262,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
                                   audioProvider.marks[index].toString().split('.').first,
                                   style: TextStyle(color: Colors.white),
                                 ),
-                                onTap: () => audioProvider.seekAudio(audioProvider.marks[index]),
+                                onTap: () {
+                                  audioProvider.seekAudio(audioProvider.marks[index]);
+                                },
                               );
                             },
                           ),
@@ -273,7 +277,6 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
             ),
           ],
         ),
-        bottomSheet: MiniPlayer(),
       ),
     );
   }
@@ -282,6 +285,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
     return filePath.split('/').last.split('.').first;
   }
 }
+
 
 
 
@@ -322,14 +326,17 @@ class AudioPlayerProvider with ChangeNotifier {
     });
   }
 
-  Future<void> playAudio(String filePath) async {
+  Future<void> playAudio(String filePath, {Duration startPosition = Duration.zero}) async {
     if (isPlaying && currentFilePath == filePath) {
       await audioPlayer.pause();
       isPlaying = false;
     } else {
       currentFilePath = filePath;
-      await audioPlayer.play(DeviceFileSource(filePath));
+      await audioPlayer.play(DeviceFileSource(filePath), position: startPosition);
       isPlaying = true;
+
+      // Load the marks for this file
+      await loadMarks(filePath);
     }
     notifyListeners();
   }
@@ -353,10 +360,29 @@ class AudioPlayerProvider with ChangeNotifier {
   Future<void> markPosition(String filePath) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String marksKey = '$filePath-marks';
-    List<String>? marksList = prefs.getStringList(marksKey);
-    marks = marksList?.map((mark) => Duration(seconds: int.parse(mark))).toList() ?? [];
+
+    // Add the current position to the marks list
+    marks.add(currentPosition);
+
+    // Save the marks list to SharedPreferences
+    List<String> marksList = marks.map((mark) => mark.inSeconds.toString()).toList();
+    await prefs.setStringList(marksKey, marksList);
+
     notifyListeners();
   }
+
+// Load the marks when initializing the provider
+  Future<void> loadMarks(String filePath) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String marksKey = '$filePath-marks';
+
+    // Load the marks list from SharedPreferences
+    List<String>? marksList = prefs.getStringList(marksKey);
+    marks = marksList?.map((mark) => Duration(seconds: int.parse(mark))).toList() ?? [];
+
+    notifyListeners();
+  }
+
 }
 
 class MiniPlayer extends StatelessWidget {
@@ -366,35 +392,48 @@ class MiniPlayer extends StatelessWidget {
 
     return audioProvider.currentFilePath == null
         ? SizedBox.shrink()
-        : Container(
-      color: Colors.black54,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Now Playing: ${audioProvider.currentFilePath!.split('/').last}',
-            style: TextStyle(color: Colors.white),
+        : GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AudioPlayerScreen(
+              filePath: audioProvider.currentFilePath!,
+              startPosition: audioProvider.currentPosition,
+            ),
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: Icon(audioProvider.isPlaying ? Icons.pause : Icons.play_arrow),
-                color: Colors.white,
-                onPressed: () {
-                  audioProvider.playAudio(audioProvider.currentFilePath!);
-                },
-              ),
-              IconButton(
-                icon: Icon(Icons.close),
-                color: Colors.white,
-                onPressed: () {
-                  audioProvider.pauseAudio();
-                },
-              ),
-            ],
-          ),
-        ],
+        );
+      },
+      child: Container(
+        color: Colors.black54,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Now Playing: ${audioProvider.currentFilePath!.split('/').last}',
+              style: TextStyle(color: Colors.white),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: Icon(audioProvider.isPlaying ? Icons.pause : Icons.play_arrow),
+                  color: Colors.white,
+                  onPressed: () {
+                    audioProvider.playAudio(audioProvider.currentFilePath!);
+                  },
+                ),
+                IconButton(
+                  icon: Icon(Icons.close),
+                  color: Colors.white,
+                  onPressed: () {
+                    audioProvider.pauseAudio();
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
