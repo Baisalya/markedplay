@@ -4,19 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'Pages/Feature/Scrolltext.dart';
-import 'dart:io';
-import 'dart:ui';
-import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import 'dart:io';
-import 'dart:ui';
-import 'package:flutter/material.dart';
+import '../Feature/Scrolltext.dart';
 import 'package:provider/provider.dart';
-import 'package:audioplayers/audioplayers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 
 class AudioPlayerScreen extends StatefulWidget {
   final String filePath;
@@ -222,7 +212,8 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
                           inactiveColor: Colors.white30,
                           thumbColor: Colors.white,
                         ),
-                        SizedBox(height: 30),
+                        SizedBox(height: 0),
+
                         // Audio controls
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -253,18 +244,52 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
                         ),
                         SizedBox(height: 20),
                         // List of marks
-                        Expanded(
+                        SizedBox(
+                          height: 250, // Set the height as per your requirement
                           child: ListView.builder(
                             itemCount: audioProvider.marks.length,
                             itemBuilder: (context, index) {
-                              return ListTile(
-                                title: Text(
-                                  audioProvider.marks[index].toString().split('.').first,
-                                  style: TextStyle(color: Colors.white),
+                              Duration mark = audioProvider.marks[index];
+                              return Center(
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.blueGrey,
+                                    child: Text(
+                                      (index + 1).toString(),
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  title: Center(
+                                    child: Text(
+                                      mark.toString().split('.').first,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 1.2,
+                                        shadows: [
+                                          Shadow(
+                                            blurRadius: 2.0,
+                                            color: Colors.black54,
+                                            offset: Offset(1.0, 1.0),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  onTap: () {
+                                    audioProvider.seekAudio(mark);
+                                  },
+                                  trailing: IconButton(
+                                    icon: Icon(Icons.close, color: Colors.red),
+                                    onPressed: () {
+                                      audioProvider.deleteMark(widget.filePath, mark);
+                                    },
+                                  ),
                                 ),
-                                onTap: () {
-                                  audioProvider.seekAudio(audioProvider.marks[index]);
-                                },
                               );
                             },
                           ),
@@ -361,6 +386,11 @@ class AudioPlayerProvider with ChangeNotifier {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String marksKey = '$filePath-marks';
 
+    // Check if the current position is already marked
+    if (marks.any((mark) => mark.inSeconds == currentPosition.inSeconds)) {
+      return; // Don't mark the same second twice
+    }
+
     // Add the current position to the marks list
     marks.add(currentPosition);
 
@@ -371,6 +401,19 @@ class AudioPlayerProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteMark(String filePath, Duration mark) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String marksKey = '$filePath-marks';
+
+    // Remove the specified mark
+    marks.remove(mark);
+
+    // Save the updated marks list to SharedPreferences
+    List<String> marksList = marks.map((mark) => mark.inSeconds.toString()).toList();
+    await prefs.setStringList(marksKey, marksList);
+
+    notifyListeners();
+  }
 // Load the marks when initializing the provider
   Future<void> loadMarks(String filePath) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -385,7 +428,32 @@ class AudioPlayerProvider with ChangeNotifier {
 
 }
 
-class MiniPlayer extends StatelessWidget {
+class MiniPlayer extends StatefulWidget {
+  final VoidCallback onClose; // Add this callback to handle close action
+
+  MiniPlayer({required this.onClose}); // Pass it through the constructor
+
+  @override
+  _MiniPlayerState createState() => _MiniPlayerState();
+}
+class _MiniPlayerState extends State<MiniPlayer> with TickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this, // `vsync` comes from `TickerProviderStateMixin`
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final audioProvider = Provider.of<AudioPlayerProvider>(context);
@@ -405,29 +473,55 @@ class MiniPlayer extends StatelessWidget {
         );
       },
       child: Container(
-        color: Colors.black54,
+        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.black87, Colors.black54],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              offset: Offset(0, -2),
+              blurRadius: 8,
+            ),
+          ],
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'Now Playing: ${audioProvider.currentFilePath!.split('/').last}',
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                letterSpacing: 1.1,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
+            SizedBox(height: 5),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(
-                  icon: Icon(audioProvider.isPlaying ? Icons.pause : Icons.play_arrow),
+                  icon: Icon(
+                    audioProvider.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                    size: 30,
+                  ),
                   color: Colors.white,
                   onPressed: () {
                     audioProvider.playAudio(audioProvider.currentFilePath!);
                   },
                 ),
+                SizedBox(width: 20),
                 IconButton(
-                  icon: Icon(Icons.close),
+                  icon: Icon(Icons.close, size: 24),
                   color: Colors.white,
                   onPressed: () {
-                    audioProvider.pauseAudio();
+                    widget.onClose(); // Invoke the callback to remove MiniPlayer
                   },
                 ),
               ],

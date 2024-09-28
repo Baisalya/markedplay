@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
-import '../Audioplayer.dart';
+import 'audio player/Audioplayer.dart';
 import 'videoplayer/Videoplayer.dart';
 import '../controller/FileManagerController.dart';
 
@@ -81,7 +81,12 @@ class _HomePageState extends State<HomePage> {
           if (lastPlayedMusicPath != null) // Add this condition
             Align(
               alignment: Alignment.bottomCenter,
-              child: MiniPlayer(), // Add the MiniPlayer here
+              child: MiniPlayer(onClose: () {  // Handle removing the MiniPlayer
+                setState(() {
+                  lastPlayedMusicPath = null;
+                });
+                },
+              ),
             ),
         ],
       ),

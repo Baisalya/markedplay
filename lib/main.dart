@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:file_manager/file_manager.dart';
 
-import 'Audioplayer.dart';
+import 'Pages/audio player/Audioplayer.dart';
 import 'Pages/HomePage.dart';
 import 'Pages/videoplayer/Videoplayer.dart';
 
