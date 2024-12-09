@@ -37,6 +37,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   just_audio:
   on_audio_query:
+  audio_service:
   permission_handler:
   path_provider:
   path:
@@ -50,6 +51,9 @@ dependencies:
   volume_control:
   marquee:
   provider:
+  convex_bottom_bar:
+  salomon_bottom_bar:
+  flutter_local_notifications: ^15.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -9,6 +9,7 @@ import 'package:file_manager/file_manager.dart';
 
 import 'Pages/audio player/Audioplayer.dart';
 import 'Pages/HomePage.dart';
+import 'Pages/audio player/Audioplayerprovider.dart';
 import 'Pages/videoplayer/Videoplayer.dart';
 
 void main() {

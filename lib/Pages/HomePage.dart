@@ -1,11 +1,14 @@
 import 'dart:io';
 
+import 'package:convex_bottom_bar/convex_bottom_bar.dart';
 import 'package:file_manager/file_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:salomon_bottom_bar/salomon_bottom_bar.dart';
 
 import 'audio player/Audioplayer.dart';
+import 'audio player/Audioplayerprovider.dart';
 import 'videoplayer/Videoplayer.dart';
 import '../controller/FileManagerController.dart';
 
@@ -284,15 +287,54 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  SalomonBottomBar _buildSalomonBottomBar() {
+    return SalomonBottomBar(
+      currentIndex: _selectedIndex,
+      onTap: (index) {
+        setState(() {
+          _selectedIndex = index;
+        });
+      },
+      items: [
+        SalomonBottomBarItem(
+          icon: Icon(Icons.video_library),
+          title: Text("Videos"),
+          selectedColor: Colors.cyanAccent,
+        ),
+        SalomonBottomBarItem(
+          icon: Icon(Icons.music_note),
+          title: Text("Music"),
+          selectedColor: Colors.purpleAccent,
+        ),
+      ],
+    );
+  }
+  ConvexAppBar _buildConvexAppBar() {
+    return ConvexAppBar(
+      items: const [
+        TabItem(icon: Icons.video_library, title: 'Videos'),
+        TabItem(icon: Icons.music_note, title: 'Music'),
+      ],
+      initialActiveIndex: _selectedIndex,
+      onTap: (int index) {
+        setState(() {
+          _selectedIndex = index;
+        });
+      },
+      backgroundColor: Colors.black87,
+      activeColor: Colors.cyanAccent,
+      style: TabStyle.react,  // You can experiment with other styles like TabStyle.fixedCircle
+    );
+  }
   BottomNavigationBar _buildBottomNavigationBar() {
     return BottomNavigationBar(
       items: const <BottomNavigationBarItem>[
         BottomNavigationBarItem(
-          icon: Icon(Icons.video_library),
+          icon: Icon(Icons.video_library, size: 30),
           label: 'Videos',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.music_note),
+          icon: Icon(Icons.music_note, size: 30),
           label: 'Music',
         ),
       ],
@@ -302,9 +344,22 @@ class _HomePageState extends State<HomePage> {
           _selectedIndex = index;
         });
       },
+      backgroundColor: Colors.black87,
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: Colors.cyanAccent,
+      unselectedItemColor: Colors.grey,
+      selectedFontSize: 14,
+      unselectedFontSize: 12,
+      selectedLabelStyle: TextStyle(
+        fontWeight: FontWeight.bold,
+        letterSpacing: 1.2,
+      ),
+      unselectedLabelStyle: TextStyle(
+        letterSpacing: 1.1,
+      ),
+      showUnselectedLabels: true,
     );
   }
-
   FloatingActionButton _buildFloatingActionButton() {
     return FloatingActionButton(
       onPressed: () {
