@@ -54,6 +54,11 @@ dependencies:
   convex_bottom_bar:
   salomon_bottom_bar:
   flutter_local_notifications: ^15.0.0
+  sqflite: ^2.3.2
+  video_thumbnail: ^0.5.3
+  photo_manager: 3.6.0
+  volume_controller: ^2.0.7
+  subtitle: ^0.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

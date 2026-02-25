@@ -1,463 +1,350 @@
-import 'dart:io';
-
-import 'package:convex_bottom_bar/convex_bottom_bar.dart';
-import 'package:file_manager/file_manager.dart';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:markedplay/Pages/videoplayer/VideoListScreen.dart';
+import 'package:photo_manager/photo_manager.dart';
+import 'package:on_audio_query/on_audio_query.dart';
 import 'package:provider/provider.dart';
-import 'package:salomon_bottom_bar/salomon_bottom_bar.dart';
 
+import '../widgets/media_appbar.dart';
+import 'audio player/AudioListScreen.dart';
 import 'audio player/Audioplayer.dart';
 import 'audio player/Audioplayerprovider.dart';
 import 'videoplayer/Videoplayer.dart';
-import '../controller/FileManagerController.dart';
-
-import 'dart:io';
-
-import 'package:flutter/material.dart';
-import 'package:file_manager/file_manager.dart';
-import 'package:permission_handler/permission_handler.dart';
-class FilemanagerController {
-  final ValueNotifier<String> titleNotifier = ValueNotifier<String>("Home");
-  final FileManagerController _fileManagerController = FileManagerController();
-
-  ValueNotifier<String> get title => titleNotifier;
-
-  FileManagerController get controller => _fileManagerController;
-
-  void openDirectory(FileSystemEntity entity) {
-    _fileManagerController.openDirectory(entity);
-  }
-
-  Future<void> goToParentDirectory() async {
-    await _fileManagerController.goToParentDirectory();
-  }
-
-  void sortBy(SortBy sortBy) {
-    _fileManagerController.sortBy(sortBy);
-  }
-
-  static Future<List<Directory>> getStorageList() async {
-    return FileManager.getStorageList();
-  }
-
-  static Future<bool> requestFilesAccessPermission() async {
-    var storageStatus = await Permission.storage.request();
-    var manageStorageStatus = await Permission.manageExternalStorage.request();
-    return storageStatus.isGranted && manageStorageStatus.isGranted;
-  }
-}
 
 class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
   @override
-  _HomePageState createState() => _HomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  final FilemanagerController fileManagerController = FilemanagerController();
   int _selectedIndex = 0;
-  bool isGridView = false;
-  bool hasFileAccessPermission = false;
-  String? lastPlayedVideoPath;
-  String? lastPlayedMusicPath;
+  bool _hasPermission = false;
+
+  final OnAudioQuery _audioQuery = OnAudioQuery();
+  final MediaAppBarController _appBarController =
+  MediaAppBarController();
+
+  List<AssetPathEntity> videoFolders = [];
+  List<AlbumModel> audioFolders = [];
+
+  String? lastPlayedVideo;
+  String? lastPlayedAudio;
 
   @override
   void initState() {
     super.initState();
-    _checkFileAccessPermission();
+
+    _appBarController.addListener(() {
+      setState(() {});
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initMedia();
+    });
   }
 
-  Future<void> _checkFileAccessPermission() async {
-    bool granted = await FilemanagerController.requestFilesAccessPermission();
+  Future<void> _initMedia() async {
+    final pmPermission = await PhotoManager.requestPermissionExtend();
+    if (!pmPermission.isAuth) {
+      PhotoManager.openSetting();
+      return;
+    }
+
+    bool audioPermission = await _audioQuery.permissionsStatus();
+    if (!audioPermission) {
+      audioPermission = await _audioQuery.permissionsRequest();
+      if (!audioPermission) return;
+    }
+
+    videoFolders =
+    await PhotoManager.getAssetPathList(type: RequestType.video);
+
+    audioFolders = await _audioQuery.queryAlbums();
+
     setState(() {
-      hasFileAccessPermission = granted;
+      _hasPermission = true;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _appBar(context),
-      body: Stack(
-        children: [
-          _buildFileManager(),
-          if (lastPlayedMusicPath != null) // Add this condition
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: MiniPlayer(onClose: () {  // Handle removing the MiniPlayer
-                setState(() {
-                  lastPlayedMusicPath = null;
-                });
-                },
-              ),
-            ),
-        ],
+      appBar: MediaAppBarWidget(
+        title:
+        _selectedIndex == 0 ? "Video Folders" : "Music Folders",
+        controller: _appBarController,
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
-      floatingActionButton: _buildFloatingActionButton(), // This is placed above MiniPlayer
+      body: !_hasPermission
+          ? const Center(child: Text("Permission Required"))
+          : _selectedIndex == 0
+          ? _buildVideoFolders()
+          : _buildAudioFolders(),
+      bottomNavigationBar: _bottomNav(),
+      floatingActionButton: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: _buildFAB(),
+      ),
     );
   }
 
+  // ================= VIDEO =================
 
+  Widget _buildVideoFolders() {
+    _applyVideoSort();
 
-  AppBar _appBar(BuildContext context) {
-    return AppBar(
-      actions: [
-        IconButton(
-          onPressed: () => _sortFiles(context),
-          icon: Icon(Icons.sort_rounded),
-        ),
-        IconButton(
-          onPressed: () => _selectStorage(context),
-          icon: Icon(Icons.sd_storage_rounded),
-        ),
-        if (hasFileAccessPermission) // Add this line
-          IconButton(
-            onPressed: () {
-              // Handle permission-related action
-            },
-            icon: Icon(Icons.check_circle), // Use an appropriate icon
-          ),
-        PopupMenuButton<String>(
-          onSelected: (value) {
-            setState(() {
-              isGridView = value == 'Grid View';
-            });
-          },
-          itemBuilder: (BuildContext context) {
-            return {'List View', 'Grid View'}.map((String choice) {
-              return PopupMenuItem<String>(
-                value: choice,
-                child: Text(choice),
-              );
-            }).toList();
-          },
-        ),
-      ],
-      title: ValueListenableBuilder<String>(
-        valueListenable: fileManagerController.title,
-        builder: (context, title, _) => Text(title),
+    return _appBarController.viewMode == ViewMode.list
+        ? ListView.builder(
+      itemCount: videoFolders.length,
+      itemBuilder: (_, index) =>
+          _videoTile(videoFolders[index]),
+    )
+        : GridView.builder(
+      gridDelegate:
+      const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.3,
       ),
-      leading: IconButton(
-        icon: Icon(Icons.arrow_back),
-        onPressed: () async {
-          await fileManagerController.goToParentDirectory();
+      itemCount: videoFolders.length,
+      itemBuilder: (_, index) =>
+          _videoGrid(videoFolders[index]),
+    );
+  }
+
+  Widget _videoTile(AssetPathEntity folder) {
+    return ListTile(
+      leading: const Icon(Icons.folder, size: 35),
+      title: Text(folder.name),
+      subtitle: FutureBuilder<int>(
+        future: folder.assetCountAsync,
+        builder: (_, snapshot) {
+          if (!snapshot.hasData) return const Text("Loading...");
+          return Text("${snapshot.data} videos");
         },
       ),
-    );
-  }
+      onTap: () async {
+        final videos =
+        await folder.getAssetListPaged(page: 0, size: 1000);
 
-  Widget _buildFileManager() {
-    return FileManager(
-      controller: fileManagerController.controller,
-      builder: (context, snapshot) {
-        final List<FileSystemEntity> entities = snapshot;
-        final List<FileSystemEntity> filteredEntities = _filterEntities(entities);
-
-        return isGridView ? _buildGridView(filteredEntities) : _buildListView(filteredEntities);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VideoListScreen(
+              folderName: folder.name,
+              videos: videos,
+            ),
+          ),
+        );
       },
     );
   }
 
-  List<FileSystemEntity> _filterEntities(List<FileSystemEntity> entities) {
-    return entities.where((entity) {
-      if (FileManager.isDirectory(entity)) {
-        final directory = Directory(entity.path);
-        final List<FileSystemEntity> files = directory.listSync();
-        return files.any((file) {
-          if (_selectedIndex == 0) {
-            return file.path.endsWith('.mp4') || file.path.endsWith('.avi');
-          } else {
-            return file.path.endsWith('.mp3') || file.path.endsWith('.wav');
-          }
-        });
-      } else {
-        if (_selectedIndex == 0) {
-          return entity.path.endsWith('.mp4') || entity.path.endsWith('.avi');
-        } else {
-          return entity.path.endsWith('.mp3') || entity.path.endsWith('.wav');
-        }
-      }
-    }).toList();
-  }
+  Widget _videoGrid(AssetPathEntity folder) {
+    return FutureBuilder<int>(
+      future: folder.assetCountAsync,
+      builder: (_, snapshot) {
+        return Card(
+          child: InkWell(
+            onTap: () async {
+              final videos =
+              await folder.getAssetListPaged(page: 0, size: 1000);
 
-  Widget _buildListView(List<FileSystemEntity> entities) {
-    return ListView.builder(
-      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 0),
-      itemCount: entities.length,
-      itemBuilder: (context, index) {
-        return _fileListItem(entities[index]);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => VideoListScreen(
+                    folderName: folder.name,
+                    videos: videos,
+                  ),
+                ),
+              );
+            },
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.folder, size: 50),
+                  const SizedBox(height: 8),
+                  Text(folder.name,
+                      textAlign: TextAlign.center),
+                  if (snapshot.hasData)
+                    Text("${snapshot.data} videos"),
+                ],
+              ),
+            ),
+          ),
+        );
       },
     );
   }
 
-  Widget _buildGridView(List<FileSystemEntity> entities) {
-    return GridView.builder(
-      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 0),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
-      itemCount: entities.length,
-      itemBuilder: (context, index) {
-        return _fileGridItem(entities[index]);
-      },
-    );
+  void _applyVideoSort() {
+    switch (_appBarController.sortMode) {
+      case SortMode.name:
+        videoFolders.sort(
+                (a, b) => a.name.compareTo(b.name));
+        break;
+      case SortMode.date:
+        break; // MediaStore handles internally
+      case SortMode.size:
+        break;
+    }
   }
 
-  Widget _fileListItem(FileSystemEntity entity) {
-    return Card(
-      child: ListTile(
-        leading: _buildThumbnail(entity),
-        title: Text(FileManager.basename(entity, showFileExtension: true)),
-        subtitle: _buildSubtitle(entity),
-        onTap: () => _onFileTap(entity),
+  // ================= AUDIO =================
+
+  Widget _buildAudioFolders() {
+    _applyAudioSort();
+
+    return _appBarController.viewMode == ViewMode.list
+        ? ListView.builder(
+      itemCount: audioFolders.length,
+      itemBuilder: (_, index) =>
+          _audioTile(audioFolders[index]),
+    )
+        : GridView.builder(
+      gridDelegate:
+      const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.3,
       ),
+      itemCount: audioFolders.length,
+      itemBuilder: (_, index) =>
+          _audioGrid(audioFolders[index]),
     );
   }
 
-  Widget _fileGridItem(FileSystemEntity entity) {
+  Widget _audioTile(AlbumModel album) {
+    return ListTile(
+      leading: const Icon(Icons.folder, size: 35),
+      title: Text(album.album),
+      subtitle: Text("${album.numOfSongs} songs"),
+      onTap: () async {
+        final songs = await _audioQuery.queryAudiosFrom(
+          AudiosFromType.ALBUM_ID,
+          album.id,
+        );
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AudioListScreen(
+              albumName: album.album,
+              songs: songs,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _audioGrid(AlbumModel album) {
     return Card(
       child: InkWell(
-        onTap: () => _onFileTap(entity),
-        child: GridTile(
-          child: _buildThumbnail(entity),
-          footer: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              FileManager.basename(entity, showFileExtension: true),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+        onTap: () async {
+          final songs = await _audioQuery.queryAudiosFrom(
+            AudiosFromType.ALBUM_ID,
+            album.id,
+          );
 
-  Widget _buildThumbnail(FileSystemEntity entity) {
-    if (FileManager.isDirectory(entity)) {
-      return Icon(Icons.folder);
-    } else {
-      return Icon(entity.path.endsWith('.mp3') || entity.path.endsWith('.wav')
-          ? Icons.music_note
-          : Icons.video_library);
-    }
-  }
-
-  Widget _buildSubtitle(FileSystemEntity entity) {
-    return FutureBuilder<FileStat>(
-      future: entity.stat(),
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          if (entity is File) {
-            int size = snapshot.data!.size;
-            return Text("${FileManager.formatBytes(size)}");
-          }
-          return Text("${snapshot.data!.modified}".substring(0, 10));
-        } else {
-          return Text("");
-        }
-      },
-    );
-  }
-
-  void _onFileTap(FileSystemEntity entity) {
-    if (FileManager.isDirectory(entity)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        fileManagerController.openDirectory(entity);
-      });
-    } else {
-      if (entity.path.endsWith('.mp3') || entity.path.endsWith('.wav')) {
-        lastPlayedMusicPath = entity.path;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AudioPlayerScreen(
-              filePath: entity.path,
-              startPosition: Duration.zero, // Start from the beginning
-            ),
-          ),
-        );
-      } else if (entity.path.endsWith('.mp4') || entity.path.endsWith('.avi')) {
-        lastPlayedVideoPath = entity.path;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VideoPlayerScreen(filePath: entity.path),
-          ),
-        );
-      }
-    }
-  }
-
-  SalomonBottomBar _buildSalomonBottomBar() {
-    return SalomonBottomBar(
-      currentIndex: _selectedIndex,
-      onTap: (index) {
-        setState(() {
-          _selectedIndex = index;
-        });
-      },
-      items: [
-        SalomonBottomBarItem(
-          icon: Icon(Icons.video_library),
-          title: Text("Videos"),
-          selectedColor: Colors.cyanAccent,
-        ),
-        SalomonBottomBarItem(
-          icon: Icon(Icons.music_note),
-          title: Text("Music"),
-          selectedColor: Colors.purpleAccent,
-        ),
-      ],
-    );
-  }
-  ConvexAppBar _buildConvexAppBar() {
-    return ConvexAppBar(
-      items: const [
-        TabItem(icon: Icons.video_library, title: 'Videos'),
-        TabItem(icon: Icons.music_note, title: 'Music'),
-      ],
-      initialActiveIndex: _selectedIndex,
-      onTap: (int index) {
-        setState(() {
-          _selectedIndex = index;
-        });
-      },
-      backgroundColor: Colors.black87,
-      activeColor: Colors.cyanAccent,
-      style: TabStyle.react,  // You can experiment with other styles like TabStyle.fixedCircle
-    );
-  }
-  BottomNavigationBar _buildBottomNavigationBar() {
-    return BottomNavigationBar(
-      items: const <BottomNavigationBarItem>[
-        BottomNavigationBarItem(
-          icon: Icon(Icons.video_library, size: 30),
-          label: 'Videos',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.music_note, size: 30),
-          label: 'Music',
-        ),
-      ],
-      currentIndex: _selectedIndex,
-      onTap: (index) {
-        setState(() {
-          _selectedIndex = index;
-        });
-      },
-      backgroundColor: Colors.black87,
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: Colors.cyanAccent,
-      unselectedItemColor: Colors.grey,
-      selectedFontSize: 14,
-      unselectedFontSize: 12,
-      selectedLabelStyle: TextStyle(
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.2,
-      ),
-      unselectedLabelStyle: TextStyle(
-        letterSpacing: 1.1,
-      ),
-      showUnselectedLabels: true,
-    );
-  }
-  FloatingActionButton _buildFloatingActionButton() {
-    return FloatingActionButton(
-      onPressed: () {
-        if (_selectedIndex == 0 && lastPlayedVideoPath != null) {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => VideoPlayerScreen(filePath: lastPlayedVideoPath!),
+              builder: (_) => AudioListScreen(
+                albumName: album.album,
+                songs: songs,
+              ),
             ),
           );
-        } else if (_selectedIndex == 1 && lastPlayedMusicPath != null) {
+        },
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.folder, size: 50),
+              const SizedBox(height: 8),
+              Text(album.album,
+                  textAlign: TextAlign.center),
+              Text("${album.numOfSongs} songs"),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _applyAudioSort() {
+    switch (_appBarController.sortMode) {
+      case SortMode.name:
+        audioFolders.sort(
+                (a, b) => a.album.compareTo(b.album));
+        break;
+      case SortMode.date:
+        break;
+      case SortMode.size:
+        audioFolders.sort((a, b) =>
+            b.numOfSongs.compareTo(a.numOfSongs));
+        break;
+    }
+  }
+
+  // ================= NAVIGATION =================
+
+  Widget _bottomNav() {
+    return BottomNavigationBar(
+      currentIndex: _selectedIndex,
+      onTap: (i) => setState(() => _selectedIndex = i),
+      selectedItemColor: Colors.cyanAccent,
+      backgroundColor: Colors.black87,
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.video_library),
+          label: "Videos",
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.music_note),
+          label: "Music",
+        ),
+      ],
+    );
+  }
+
+  Widget? _buildFAB() {
+    // Decide if FAB should be visible
+    final bool showFab =
+        (_selectedIndex == 0 && lastPlayedVideo != null) ||
+            (_selectedIndex == 1 && lastPlayedAudio != null);
+
+    if (!showFab) return null;
+
+    return FloatingActionButton(
+      child: const Icon(Icons.play_arrow),
+      onPressed: () {
+        if (_selectedIndex == 0 && lastPlayedVideo != null) {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => AudioPlayerScreen(
-                filePath: lastPlayedMusicPath!,
-                startPosition: Provider.of<AudioPlayerProvider>(context, listen: false).currentPosition,
+              builder: (_) =>
+                  VideoPlayerScreen(filePath: lastPlayedVideo!),
+            ),
+          );
+        }
+
+        if (_selectedIndex == 1 && lastPlayedAudio != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AudioPlayerScreen(
+                filePath: lastPlayedAudio!,
+                startPosition:
+                Provider.of<AudioPlayerProvider>(
+                  context,
+                  listen: false,
+                ).currentPosition,
               ),
             ),
           );
         }
       },
-      child: Icon(Icons.play_arrow),
     );
-  }
-
-  Future<void> _selectStorage(BuildContext context) async {
-    return showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          content: Container(
-            width: double.maxFinite,
-            height: 200,
-            child: FutureBuilder<List<Directory>>(
-              future: FilemanagerController.getStorageList(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done) {
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: snapshot.data?.length ?? 0,
-                    itemBuilder: (context, index) {
-                      return ListTile(
-                        title: Text(snapshot.data![index].path),
-                        onTap: () {
-                          fileManagerController.openDirectory(snapshot.data![index]);
-                          Navigator.pop(context);
-                        },
-                      );
-                    },
-                  );
-                } else {
-                  return Center(child: CircularProgressIndicator());
-                }
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _sortFiles(BuildContext context) async {
-    return showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          content: Container(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  title: Text("By Name"),
-                  onTap: () {
-                    fileManagerController.sortBy(SortBy.name);
-                    Navigator.pop(context);
-                  },
-                ),
-                ListTile(
-                  title: Text("By Date"),
-                  onTap: () {
-                    fileManagerController.sortBy(SortBy.date);
-                    Navigator.pop(context);
-                  },
-                ),
-                ListTile(
-                  title: Text("By Size"),
-                  onTap: () {
-                    fileManagerController.sortBy(SortBy.size);
-                    Navigator.pop(context);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
+  }}

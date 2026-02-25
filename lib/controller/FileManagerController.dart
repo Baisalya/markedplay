@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:file_manager/file_manager.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-class FilemanagerController {
+class FilemanagerControllerS {
   final ValueNotifier<String> titleNotifier = ValueNotifier<String>("Home");
   final FileManagerController _fileManagerController = FileManagerController();
 
