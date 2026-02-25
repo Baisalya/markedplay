@@ -11,6 +11,7 @@ import 'Pages/audio player/Audioplayer.dart';
 import 'Pages/HomePage.dart';
 import 'Pages/audio player/Audioplayerprovider.dart';
 import 'Pages/videoplayer/Videoplayer.dart';
+import 'core/app_settings_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +29,8 @@ class _MyAppState extends State<MyApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AudioPlayerProvider()),
+        ChangeNotifierProvider(create: (_) => AppSettingsProvider(),
+        ),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

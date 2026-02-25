@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-
-enum ViewMode { list, grid }
-enum SortMode { name, date, size }
-
+import '../core/media_enums.dart';
 class MediaAppBarController extends ChangeNotifier {
   ViewMode viewMode = ViewMode.list;
   SortMode sortMode = SortMode.name;
