@@ -75,7 +75,36 @@ class ModernDrawer extends StatelessWidget {
                 ),
 
                 const SizedBox(height: 40),
+                _sectionTitle("Browse Mode", theme),
 
+                _drawerTile(
+                  icon: Icons.dashboard,
+                  title: "All Folders",
+                  selected: settings.browseMode == BrowseMode.allFolders,
+                  onTap: () => settings.setBrowseMode(BrowseMode.allFolders),
+                  theme: theme,
+                  settings: settings,
+                ),
+
+                _drawerTile(
+                  icon: Icons.folder,
+                  title: "Folders",
+                  selected: settings.browseMode == BrowseMode.folders,
+                  onTap: () => settings.setBrowseMode(BrowseMode.folders),
+                  theme: theme,
+                  settings: settings,
+                ),
+
+                _drawerTile(
+                  icon: Icons.insert_drive_file,
+                  title: "Files",
+                  selected: settings.browseMode == BrowseMode.files,
+                  onTap: () => settings.setBrowseMode(BrowseMode.files),
+                  theme: theme,
+                  settings: settings,
+                ),
+
+                const SizedBox(height: 30),
                 _sectionTitle("View Mode", theme),
 
                 _drawerTile(

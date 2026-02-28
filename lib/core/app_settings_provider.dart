@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'media_enums.dart';
 
 class AppSettingsProvider extends ChangeNotifier {
@@ -7,12 +8,14 @@ class AppSettingsProvider extends ChangeNotifier {
   AppTheme _theme = AppTheme.neon;
   ViewMode _viewMode = ViewMode.grid;
   SortMode _sortMode = SortMode.name;
+  BrowseMode _browseMode = BrowseMode.allFolders;
 
   Color _customPrimary = Colors.blueAccent;
 
   AppTheme get theme => _theme;
   ViewMode get viewMode => _viewMode;
   SortMode get sortMode => _sortMode;
+  BrowseMode get browseMode => _browseMode;
   Color get customPrimary => _customPrimary;
 
   AppSettingsProvider() {
@@ -33,10 +36,22 @@ class AppSettingsProvider extends ChangeNotifier {
     _sortMode = SortMode.values[
     prefs.getInt("sortMode") ?? 0];
 
+    _browseMode = BrowseMode.values[
+    prefs.getInt("browseMode") ?? 0];
+
     _customPrimary = Color(
         prefs.getInt("customPrimary") ??
             Colors.blueAccent.value);
 
+    notifyListeners();
+  }
+
+  // ================= BROWSE MODE =================
+
+  Future<void> setBrowseMode(BrowseMode mode) async {
+    _browseMode = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt("browseMode", mode.index);
     notifyListeners();
   }
 
@@ -59,14 +74,14 @@ class AppSettingsProvider extends ChangeNotifier {
 
   // ================= VIEW =================
 
-  void setViewMode(ViewMode mode) async {
+  Future<void> setViewMode(ViewMode mode) async {
     _viewMode = mode;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt("viewMode", mode.index);
     notifyListeners();
   }
 
-  void setSortMode(SortMode mode) async {
+  Future<void> setSortMode(SortMode mode) async {
     _sortMode = mode;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt("sortMode", mode.index);
