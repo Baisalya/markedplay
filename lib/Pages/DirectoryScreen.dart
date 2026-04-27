@@ -1,12 +1,14 @@
 import 'dart:io';
+import 'dart:math' as Math;
 import 'package:flutter/material.dart';
 import 'package:markedplay/Pages/videoplayer/Videoplayer.dart';
+import 'package:provider/provider.dart';
 import '../../core/services/file_browser_service.dart';
 import '../../core/theme_helper.dart';
 import '../../core/app_settings_provider.dart';
 import '../../core/media_enums.dart';
-import 'package:provider/provider.dart';
-
+import 'package:on_audio_query/on_audio_query.dart';
+import '../../widgets/local_video_thumbnail.dart';
 import 'audio player/Audioplayer.dart';
 import 'audio player/Audioplayerprovider.dart';
 
@@ -37,7 +39,15 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool refresh = false}) async {
+    if (refresh) {
+      _fileBrowserService.clearCache();
+    }
+
+    if (items.isEmpty) {
+      setState(() => isLoading = true);
+    }
+
     final data = await _fileBrowserService.loadDirectory(
       widget.path,
       widget.isVideo,
@@ -57,16 +67,6 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
     final settings = context.watch<AppSettingsProvider>();
     final theme = settings.theme;
 
-    final primaryColor = ThemeHelper.primary(
-      theme,
-      customColor: settings.customPrimary,
-    );
-
-    final backgroundColor = ThemeHelper.background(
-      theme,
-      customColor: settings.customPrimary,
-    );
-
     // ✅ Apply Sorting
     List<FileSystemEntity> sorted = List.from(items);
 
@@ -79,7 +79,7 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
     }
 
      return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: Colors.transparent,
       extendBody: true,
       body: Stack(
         children: [
@@ -122,7 +122,14 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 48), // balance back button
+                      IconButton(
+                        icon: Icon(Icons.refresh,
+                            color: ThemeHelper.primary(
+                              theme,
+                              customColor: settings.customPrimary,
+                            )),
+                        onPressed: () => _load(refresh: true),
+                      ),
                     ],
                   ),
                 ),
@@ -131,9 +138,12 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
                   child: isLoading
                       ? const Center(
                       child: CircularProgressIndicator())
-                      : settings.viewMode == ViewMode.list
-                      ? _buildList(sorted, settings, theme)
-                      : _buildGrid(sorted, settings, theme),
+                      : RefreshIndicator(
+                          onRefresh: () => _load(refresh: true),
+                          child: settings.viewMode == ViewMode.list
+                            ? _buildList(sorted, settings, theme)
+                            : _buildGrid(sorted, settings, theme),
+                      ),
                 ),
               ],
             ),
@@ -151,73 +161,107 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
       AppTheme theme) {
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: sorted.length,
       itemBuilder: (_, index) {
 
         final item = sorted[index];
         final name = item.path.split('/').last;
+        final isFolder = item is Directory;
+        final isVideo = !isFolder && _fileBrowserService.isVideoFile(item.path);
+        final isAudio = !isFolder && _fileBrowserService.isAudioFile(item.path);
 
-        return ListTile(
-          leading: Icon(
-            item is Directory
-                ? Icons.folder
-                : Icons.insert_drive_file,
-            color: ThemeHelper.primary(
-              theme,
-              customColor: settings.customPrimary,
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: ThemeHelper.cardColor(theme, customColor: settings.customPrimary).withOpacity(0.5),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: ThemeHelper.borderColor(theme, customColor: settings.customPrimary).withOpacity(0.1),
             ),
           ),
-          title: Text(
-            name,
-            style: TextStyle(
-              color: ThemeHelper.textPrimary(theme),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: SizedBox(
+              width: 50,
+              height: 50,
+              child: isFolder
+                  ? Icon(Icons.folder, size: 40, color: ThemeHelper.primary(theme, customColor: settings.customPrimary))
+                  : isVideo
+                      ? LocalVideoThumbnail(path: item.path)
+                      : Container(
+                          decoration: BoxDecoration(
+                            color: ThemeHelper.primary(theme, customColor: settings.customPrimary).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.music_note, color: ThemeHelper.primary(theme, customColor: settings.customPrimary)),
+                        ),
             ),
-          ),
-            onTap: () {
-              if (item is Directory) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DirectoryScreen(
-                      path: item.path,
-                      isVideo: widget.isVideo,
-                    ),
+            title: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: ThemeHelper.textPrimary(theme),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            subtitle: isFolder 
+                ? null 
+                : Text(
+                    _getFileSize(item as File),
+                    style: TextStyle(color: ThemeHelper.textSecondary(theme), fontSize: 12),
                   ),
-                );
-              } else {
-                if (widget.isVideo &&
-                    _fileBrowserService.isVideoFile(item.path)) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => VideoPlayerScreen(
-                        filePath: item.path,
-                      ),
-                    ),
-                  );
-                }
-
-                if (!widget.isVideo &&
-                    _fileBrowserService.isAudioFile(item.path)) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AudioPlayerScreen(
-                        filePath: item.path,
-                        startPosition:
-                        Provider.of<AudioPlayerProvider>(
-                          context,
-                          listen: false,
-                        ).currentPosition,
-                      ),
-                    ),
-                  );
-                }
-              }
-            },        );
+            onTap: () => _handleTap(item),
+          ),
+        );
       },
     );
+  }
+
+  String _getFileSize(File file) {
+    try {
+      int bytes = file.lengthSync();
+      if (bytes <= 0) return "0 B";
+      const suffixes = ["B", "KB", "MB", "GB", "TB"];
+      var i = (Math.log(bytes) / Math.log(1024)).floor();
+      return ((bytes / Math.pow(1024, i)).toStringAsFixed(1)) + ' ' + suffixes[i];
+    } catch (_) {
+      return "";
+    }
+  }
+
+  void _handleTap(FileSystemEntity item) {
+    if (item is Directory) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DirectoryScreen(
+            path: item.path,
+            isVideo: widget.isVideo,
+          ),
+        ),
+      );
+    } else {
+      if (widget.isVideo && _fileBrowserService.isVideoFile(item.path)) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VideoPlayerScreen(filePath: item.path),
+          ),
+        );
+      } else if (!widget.isVideo && _fileBrowserService.isAudioFile(item.path)) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AudioPlayerScreen(
+              filePath: item.path,
+              startPosition: Provider.of<AudioPlayerProvider>(context, listen: false).currentPosition,
+            ),
+          ),
+        );
+      }
+    }
   }
 
   // ================= GRID VIEW =================
@@ -230,67 +274,81 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: sorted.length,
-      gridDelegate:
-      const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
+        childAspectRatio: 0.85,
       ),
       itemBuilder: (_, index) {
 
         final item = sorted[index];
         final name = item.path.split('/').last;
+        final isFolder = item is Directory;
+        final isVideo = !isFolder && _fileBrowserService.isVideoFile(item.path);
 
         return GestureDetector(
-          onTap: () {
-            if (item is Directory) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DirectoryScreen(
-                    path: item.path,
-                    isVideo: widget.isVideo,
-                  ),
-                ),
-              );
-            }
-          },
+          onTap: () => _handleTap(item),
           child: Container(
             decoration: BoxDecoration(
-              color: ThemeHelper.cardColor(
-                theme,
-                customColor: settings.customPrimary,
-              ),
-              borderRadius: BorderRadius.circular(25),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  item is Directory
-                      ? Icons.folder
-                      : Icons.insert_drive_file,
-                  size: 40,
-                  color: ThemeHelper.primary(
-                    theme,
-                    customColor: settings.customPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    name,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color:
-                      ThemeHelper.textPrimary(theme),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+              color: ThemeHelper.cardColor(theme, customColor: settings.customPrimary),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
                 ),
               ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Column(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Container(
+                      width: double.infinity,
+                      color: ThemeHelper.primary(theme, customColor: settings.customPrimary).withOpacity(0.1),
+                      child: isFolder
+                          ? Icon(Icons.folder, size: 60, color: ThemeHelper.primary(theme, customColor: settings.customPrimary))
+                          : isVideo
+                              ? LocalVideoThumbnail(path: item.path)
+                              : Icon(Icons.music_note, size: 60, color: ThemeHelper.primary(theme, customColor: settings.customPrimary)),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            name,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: ThemeHelper.textPrimary(theme),
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (!isFolder)
+                             Text(
+                              _getFileSize(item as File),
+                              style: TextStyle(
+                                color: ThemeHelper.textSecondary(theme),
+                                fontSize: 10,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );

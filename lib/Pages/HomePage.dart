@@ -16,6 +16,7 @@ import '../../core/services/video_service.dart';
 import '../../core/services/audio_service.dart';
 import '../../core/services/file_browser_service.dart';
 
+import '../../core/services/thumbnail_service.dart';
 import '../../widgets/modern_drawer.dart';
 
 import 'DirectoryScreen.dart';
@@ -45,7 +46,9 @@ class _HomePageState extends State<HomePage>
 
   List<AssetPathEntity> videoFolders = [];
   List<AlbumModel> audioFolders = [];
-  List<FileSystemEntity> _rootItems = [];
+  List<FileSystemEntity> _videoRootItems = [];
+  List<FileSystemEntity> _audioRootItems = [];
+  bool _isLoadingRoot = false;
   late AnimationController _bgController;
 
   final String _rootPath = "/storage/emulated/0";
@@ -126,9 +129,11 @@ class _HomePageState extends State<HomePage>
 
     final settings = context.watch<AppSettingsProvider>();
     final theme = settings.theme;
-    if (settings.browseMode == BrowseMode.folders &&
-        _rootItems.isEmpty) {
-      _loadRoot();
+    if (settings.browseMode == BrowseMode.folders) {
+      final items = _selectedIndex == 0 ? _videoRootItems : _audioRootItems;
+      if (items.isEmpty && !_isLoadingRoot) {
+        _loadRoot();
+      }
     }
     return Scaffold(
       extendBody: true,   // 🔥 ADD THIS
@@ -228,7 +233,16 @@ class _HomePageState extends State<HomePage>
                   theme),
             ),
           ),
-          const SizedBox(width: 40),
+          IconButton(
+            icon: Icon(
+              Icons.refresh,
+              color: ThemeHelper.primary(
+                theme,
+                customColor: settings.customPrimary,
+              ),
+            ),
+            onPressed: () => _loadRoot(refresh: true),
+          ),
         ],
       ),
     );
@@ -247,7 +261,10 @@ class _HomePageState extends State<HomePage>
             theme, settings);
 
       case BrowseMode.folders:
-        return _rootFolderUI(theme, settings);
+        return RefreshIndicator(
+          onRefresh: () => _loadRoot(refresh: true),
+          child: _rootFolderUI(theme, settings),
+        );
 
       case BrowseMode.files:
         return _videoFilesMode(
@@ -268,7 +285,10 @@ class _HomePageState extends State<HomePage>
             theme, settings);
 
       case BrowseMode.folders:
-        return _rootFolderUI(theme, settings);
+        return RefreshIndicator(
+          onRefresh: () => _loadRoot(refresh: true),
+          child: _rootFolderUI(theme, settings),
+        );
 
       case BrowseMode.files:
         return _audioFilesMode(
@@ -277,14 +297,39 @@ class _HomePageState extends State<HomePage>
   }
 
   // ================= ROOT DIRECTORY =================
-  Future<void> _loadRoot() async {
+  Future<void> _loadRoot({bool refresh = false}) async {
+    final isVideo = _selectedIndex == 0;
+
+    if (!refresh) {
+      if (isVideo && _videoRootItems.isNotEmpty) return;
+      if (!isVideo && _audioRootItems.isNotEmpty) return;
+    }
+
+    if (refresh) {
+      _fileBrowserService.clearCache();
+      await ThumbnailService().clearAll();
+    }
+
+    setState(() {
+      _isLoadingRoot = true;
+      if (refresh) {
+        _videoRootItems.clear();
+        _audioRootItems.clear();
+      }
+    });
+
     final items = await _fileBrowserService
-        .loadDirectory(_rootPath, _selectedIndex == 0);
+        .loadDirectory(_rootPath, isVideo);
 
     if (!mounted) return;
 
     setState(() {
-      _rootItems = items;
+      if (isVideo) {
+        _videoRootItems = items;
+      } else {
+        _audioRootItems = items;
+      }
+      _isLoadingRoot = false;
     });
   }
 
@@ -609,8 +654,9 @@ class _HomePageState extends State<HomePage>
 
         setState(() {
           _selectedIndex = index;
-          _rootItems.clear(); // reload root for folder mode
         });
+
+        _loadRoot();
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 350),
@@ -711,13 +757,24 @@ class _HomePageState extends State<HomePage>
       AppTheme theme,
       AppSettingsProvider settings) {
 
-    if (_rootItems.isEmpty) {
+    final items = _selectedIndex == 0 ? _videoRootItems : _audioRootItems;
+
+    if (_isLoadingRoot && items.isEmpty) {
       return const Center(
           child: CircularProgressIndicator());
     }
 
+    if (items.isEmpty) {
+      return Center(
+        child: Text(
+          "No folders found",
+          style: TextStyle(color: ThemeHelper.textSecondary(theme)),
+        ),
+      );
+    }
+
     List<FileSystemEntity> sorted =
-    List.from(_rootItems);
+    List.from(items);
 
     if (settings.sortMode == SortMode.name) {
       sorted.sort((a, b) =>

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../core/app_settings_provider.dart';
 import '../../core/media_enums.dart';
 import '../../core/theme_helper.dart';
+import '../../widgets/local_video_thumbnail.dart';
 import 'Videoplayer.dart';
 
 class VideoListScreen extends StatelessWidget {
@@ -127,41 +128,7 @@ class VideoListScreen extends StatelessWidget {
                 ),
               ),
               child: ListTile(
-                leading:
-                FutureBuilder<Uint8List?>(
-                  future:
-                  video.thumbnailDataWithSize(
-                    const ThumbnailSize(
-                        200, 200),
-                  ),
-                  builder: (_, snap) {
-
-                    if (!snap.hasData) {
-                      return Icon(
-                        Icons.video_library,
-                        color:
-                        ThemeHelper.primary(
-                          theme,
-                          customColor:
-                          settings
-                              .customPrimary,
-                        ),
-                      );
-                    }
-
-                    return ClipRRect(
-                      borderRadius:
-                      BorderRadius.circular(
-                          8),
-                      child: Image.memory(
-                        snap.data!,
-                        width: 70,
-                        height: 50,
-                        fit: BoxFit.cover,
-                      ),
-                    );
-                  },
-                ),
+                leading: LocalVideoThumbnail(path: snapshot.data!.path),
                 title: Text(
                   video.title ?? "Video",
                   style: TextStyle(
@@ -254,50 +221,7 @@ class VideoListScreen extends StatelessWidget {
 
                     // 🎬 Thumbnail
                     Expanded(
-                      child:
-                      FutureBuilder<
-                          Uint8List?>(
-                        future:
-                        video.thumbnailDataWithSize(
-                          const ThumbnailSize(
-                              400, 400),
-                        ),
-                        builder:
-                            (_, snap) {
-
-                          if (!snap.hasData) {
-                            return Icon(
-                              Icons.video_library,
-                              color:
-                              ThemeHelper
-                                  .primary(
-                                theme,
-                                customColor:
-                                settings
-                                    .customPrimary,
-                              ),
-                              size: 40,
-                            );
-                          }
-
-                          return ClipRRect(
-                            borderRadius:
-                            const BorderRadius
-                                .vertical(
-                              top:
-                              Radius.circular(
-                                  20),
-                            ),
-                            child:
-                            Image.memory(
-                              snap.data!,
-                              width: double
-                                  .infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          );
-                        },
-                      ),
+                      child: LocalVideoThumbnail(path: snapshot.data!.path),
                     ),
 
                     // 🎞 Title

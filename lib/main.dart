@@ -13,8 +13,14 @@ import 'Pages/audio player/Audioplayerprovider.dart';
 import 'Pages/videoplayer/Videoplayer.dart';
 import 'core/app_settings_provider.dart';
 
-void main() {
+import 'core/services/thumbnail_service.dart';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Thumbnail Service
+  await ThumbnailService().init();
+
   runApp(MyApp());
 }
 

@@ -20,6 +20,38 @@ class FileBrowserService {
         ext.endsWith(".flac");
   }
 
+  final Map<String, bool> _hasMediaCache = {};
+
+  void clearCache() {
+    _hasMediaCache.clear();
+  }
+
+  Future<bool> _containsRelevantFiles(Directory dir, bool isVideoTab) async {
+    final cacheKey = "${dir.path}_$isVideoTab";
+    if (_hasMediaCache.containsKey(cacheKey)) {
+      return _hasMediaCache[cacheKey]!;
+    }
+
+    try {
+      // Use stream for better performance and early exit
+      final hasMedia = await dir.list(recursive: true, followLinks: false).any((entity) {
+        if (entity is File) {
+          if (isVideoTab) {
+            return isVideoFile(entity.path);
+          } else {
+            return isAudioFile(entity.path);
+          }
+        }
+        return false;
+      });
+
+      _hasMediaCache[cacheKey] = hasMedia;
+      return hasMedia;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<List<FileSystemEntity>> loadDirectory(
       String path,
       bool isVideoTab,
@@ -31,31 +63,36 @@ class FileBrowserService {
 
       final items = dir.listSync();
 
-      List<FileSystemEntity> filtered = [];
-
-      for (var item in items) {
+      // We'll process directories in parallel to speed things up
+      List<Future<FileSystemEntity?>> futures = items.map((item) async {
         try {
           if (item is Directory) {
-            // 🚫 Skip restricted Android folders
-            if (item.path.contains("/Android/data") ||
+            final name = item.path.split('/').last;
+            // 🚫 Skip restricted or irrelevant folders
+            if (name.startsWith('.') ||
+                item.path.contains("/Android/data") ||
                 item.path.contains("/Android/obb")) {
-              continue;
+              return null;
             }
-            filtered.add(item);
+
+            // ✅ Only add directory if it contains relevant files
+            if (await _containsRelevantFiles(item, isVideoTab)) {
+              return item;
+            }
           } else if (item is File) {
             if (isVideoTab && isVideoFile(item.path)) {
-              filtered.add(item);
+              return item;
             }
             if (!isVideoTab && isAudioFile(item.path)) {
-              filtered.add(item);
+              return item;
             }
           }
-        } catch (_) {
-          // Ignore individual item errors
-        }
-      }
+        } catch (_) {}
+        return null;
+      }).toList();
 
-      return filtered;
+      final results = await Future.wait(futures);
+      return results.whereType<FileSystemEntity>().toList();
     } catch (e) {
       print("Directory access error: $e");
       return [];
