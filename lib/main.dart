@@ -16,12 +16,14 @@ import 'core/app_settings_provider.dart';
 import 'core/services/thumbnail_service.dart';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:media_kit/media_kit.dart';
 import 'Pages/audio player/AudioHandler.dart';
 
 late MyAudioHandler _audioHandler;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
   
   _audioHandler = await AudioService.init(
     builder: () => MyAudioHandler(),
