@@ -15,12 +15,25 @@ import 'core/app_settings_provider.dart';
 
 import 'core/services/thumbnail_service.dart';
 
+import 'package:audio_service/audio_service.dart';
+import 'Pages/audio player/AudioHandler.dart';
+
+late MyAudioHandler _audioHandler;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Thumbnail Service
-  await ThumbnailService().init();
+  _audioHandler = await AudioService.init(
+    builder: () => MyAudioHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.passontaetech.markedplay.audio',
+      androidNotificationChannelName: 'MarkedPlay Audio',
+      androidNotificationOngoing: true,
+      androidShowNotificationBadge: true,
+    ),
+  );
 
+  await ThumbnailService().init();
   runApp(MyApp());
 }
 
@@ -34,9 +47,8 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AudioPlayerProvider()),
-        ChangeNotifierProvider(create: (_) => AppSettingsProvider(),
-        ),
+        ChangeNotifierProvider(create: (_) => AudioPlayerProvider(_audioHandler)),
+        ChangeNotifierProvider(create: (_) => AppSettingsProvider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

@@ -18,7 +18,7 @@ class AudioPlayerScreen extends StatefulWidget {
   _AudioPlayerScreenState createState() => _AudioPlayerScreenState();
 }
 
-class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTickerProviderStateMixin {
+class _AudioPlayerScreenState extends State<AudioPlayerScreen> with TickerProviderStateMixin {
   late AnimationController _animationController;
 
   final List<String> _backgroundImages = [
@@ -114,24 +114,29 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
           ),
 
           SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 20),
-                Expanded(
-                  flex: 5,
-                  child: _buildCyberVinyl(audioProvider),
+            child: SingleChildScrollView(
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    Expanded(
+                      flex: 5,
+                      child: _buildCyberVinyl(audioProvider),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: _buildInfoAndSlider(audioProvider),
+                    ),
+                    _buildMainControls(audioProvider),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      flex: 3,
+                      child: _buildMarksList(audioProvider),
+                    ),
+                  ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: _buildInfoAndSlider(audioProvider),
-                ),
-                _buildMainControls(audioProvider),
-                const SizedBox(height: 10),
-                Expanded(
-                  flex: 3,
-                  child: _buildMarksList(audioProvider),
-                ),
-              ],
+              ),
             ),
           ),
         ],
@@ -283,7 +288,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with SingleTicker
                     thumbColor: Colors.white,
                   ),
                   child: Slider(
-                    value: provider.currentPosition.inSeconds.toDouble(),
+                    value: provider.currentPosition.inSeconds.toDouble().clamp(0.0, totalSecs > 0 ? totalSecs : 100.0),
                     max: totalSecs > 0 ? totalSecs : 100,
                     onChanged: (value) => provider.seekAudio(Duration(seconds: value.toInt())),
                   ),

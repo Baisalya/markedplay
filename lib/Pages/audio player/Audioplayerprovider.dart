@@ -1,19 +1,16 @@
-
-
-
-
-
-
-
-import 'package:audioplayers/audioplayers.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:audio_service/audio_service.dart';
+import 'package:path_provider/path_provider.dart';
+import 'AudioHandler.dart';
 
 class AudioPlayerProvider with ChangeNotifier {
-  final AudioPlayer audioPlayer = AudioPlayer();
+  final MyAudioHandler _audioHandler;
   final OnAudioQuery _audioQuery = OnAudioQuery();
+  
   bool isPlaying = false;
   Duration currentPosition = Duration.zero;
   Duration totalDuration = Duration.zero;
@@ -22,126 +19,151 @@ class AudioPlayerProvider with ChangeNotifier {
   String? currentFilePath;
   int? currentSongId;
   Uint8List? currentArtworkBytes;
+  
+  List<SongModel> _playlist = [];
+  int _currentIndex = -1;
 
-  AudioPlayerProvider() {
-    audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
-      isPlaying = state == PlayerState.playing;
+  AudioProcessingState _processingState = AudioProcessingState.idle;
+
+  AudioPlayerProvider(this._audioHandler) {
+    _audioHandler.playbackState.listen((state) {
+      isPlaying = state.playing;
+      _processingState = state.processingState;
+      if (state.processingState == AudioProcessingState.completed) {
+        _handleSongCompletion();
+      }
       notifyListeners();
     });
-
-    audioPlayer.onPositionChanged.listen((Duration position) {
+    AudioService.position.listen((position) {
       currentPosition = position;
       notifyListeners();
     });
-
-    audioPlayer.onDurationChanged.listen((Duration duration) {
-      totalDuration = duration;
+    _audioHandler.mediaItem.listen((item) {
+      totalDuration = item?.duration ?? Duration.zero;
       notifyListeners();
     });
+  }
 
-    audioPlayer.onPlayerComplete.listen((_) {
-      if (loopMode == 'Loop One') {
-        playAudio(currentFilePath!);
-      } else if (loopMode == 'Loop All') {
-        // handle loop all
-      } else {
-        isPlaying = false;
-        notifyListeners();
-      }
-    });
+  void updatePlaylist(List<SongModel> songs) {
+    _playlist = songs;
+  }
+
+  Future<void> _handleSongCompletion() async {
+    if (loopMode == 'Loop One') {
+      await seekAudio(Duration.zero);
+      await _audioHandler.play();
+    } else if (loopMode == 'Loop All') {
+      await playNext();
+    } else {
+      await _audioHandler.pause();
+    }
+  }
+
+  Future<void> playNext() async {
+    if (_playlist.isEmpty) return;
+    _currentIndex = (_currentIndex + 1) % _playlist.length;
+    await playAudio(_playlist[_currentIndex].data);
+  }
+
+  Future<void> playPrevious() async {
+    if (_playlist.isEmpty) return;
+    _currentIndex = (_currentIndex - 1 + _playlist.length) % _playlist.length;
+    await playAudio(_playlist[_currentIndex].data);
   }
 
   Future<void> playAudio(String filePath, {Duration startPosition = Duration.zero}) async {
     if (isPlaying && currentFilePath == filePath) {
-      await audioPlayer.pause();
-      isPlaying = false;
+      await _audioHandler.pause();
+    } else if (!isPlaying && currentFilePath == filePath) {
+      if (_processingState == AudioProcessingState.completed) {
+        await _audioHandler.seek(Duration.zero);
+      }
+      await _audioHandler.play();
     } else {
       currentFilePath = filePath;
-      await audioPlayer.play(DeviceFileSource(filePath), position: startPosition);
-      isPlaying = true;
+      
+      // Update index if in playlist
+      if (_playlist.isNotEmpty) {
+        _currentIndex = _playlist.indexWhere((s) => s.data == filePath);
+      }
 
-      // Try to find the song ID and artwork for display
+      String title = filePath.split('/').last.split('.').first;
+      String artist = "Unknown Artist";
+      String? artUri;
+      Duration? duration;
+
       try {
-        List<SongModel> songs = await _audioQuery.querySongs();
-        final song = songs.firstWhere((s) => s.data == filePath);
+        List<SongModel> songs = _playlist.isNotEmpty ? _playlist : await _audioQuery.querySongs();
+        final song = songs.firstWhere((s) => s.data == filePath, orElse: () => songs.first);
         currentSongId = song.id;
+        title = song.title;
+        artist = song.artist ?? "Unknown Artist";
+        duration = Duration(milliseconds: song.duration ?? 0);
         
-        // Fetch artwork bytes once to prevent flickering
         currentArtworkBytes = await _audioQuery.queryArtwork(
           song.id,
           ArtworkType.AUDIO,
           format: ArtworkFormat.JPEG,
-          size: 200,
+          size: 800, 
         );
+
+        if (currentArtworkBytes != null) {
+          final tempDir = await getTemporaryDirectory();
+          final file = File('${tempDir.path}/notif_art.jpg');
+          await file.writeAsBytes(currentArtworkBytes!);
+          artUri = file.uri.toString();
+        }
       } catch (e) {
         currentSongId = null;
         currentArtworkBytes = null;
       }
 
-      // Load the marks for this file
+      final mediaItem = MediaItem(
+        id: filePath,
+        album: "MarkedPlay",
+        title: title,
+        artist: artist,
+        duration: duration,
+        artUri: artUri != null ? Uri.parse(artUri) : null,
+      );
+
+      await _audioHandler.setAudioSource(filePath, mediaItem);
+      if (startPosition != Duration.zero) await _audioHandler.seek(startPosition);
+      await _audioHandler.play();
       await loadMarks(filePath);
     }
     notifyListeners();
   }
 
-  Future<void> pauseAudio() async {
-    await audioPlayer.pause();
-    isPlaying = false;
-    notifyListeners();
-  }
-
+  Future<void> pauseAudio() async => await _audioHandler.pause();
   Future<void> seekAudio(Duration position) async {
-    await audioPlayer.seek(position);
-    notifyListeners();
+    Duration target = position;
+    if (target < Duration.zero) target = Duration.zero;
+    if (totalDuration > Duration.zero && target > totalDuration) target = totalDuration;
+    await _audioHandler.seek(target);
   }
-
-  void setLoopMode(String mode) {
-    loopMode = mode;
-    notifyListeners();
-  }
+  void setLoopMode(String mode) { loopMode = mode; notifyListeners(); }
 
   Future<void> markPosition(String filePath) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String marksKey = '$filePath-marks';
-
-    // Check if the current position is already marked
-    if (marks.any((mark) => mark.inSeconds == currentPosition.inSeconds)) {
-      return; // Don't mark the same second twice
-    }
-
-    // Add the current position to the marks list
+    if (marks.any((mark) => mark.inSeconds == currentPosition.inSeconds)) return;
     marks.add(currentPosition);
-
-    // Save the marks list to SharedPreferences
-    List<String> marksList = marks.map((mark) => mark.inSeconds.toString()).toList();
-    await prefs.setStringList(marksKey, marksList);
-
+    await prefs.setStringList(marksKey, marks.map((m) => m.inSeconds.toString()).toList());
     notifyListeners();
   }
 
   Future<void> deleteMark(String filePath, Duration mark) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String marksKey = '$filePath-marks';
-
-    // Remove the specified mark
     marks.remove(mark);
-
-    // Save the updated marks list to SharedPreferences
-    List<String> marksList = marks.map((mark) => mark.inSeconds.toString()).toList();
-    await prefs.setStringList(marksKey, marksList);
-
+    await prefs.setStringList('$filePath-marks', marks.map((m) => m.inSeconds.toString()).toList());
     notifyListeners();
   }
-// Load the marks when initializing the provider
+
   Future<void> loadMarks(String filePath) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String marksKey = '$filePath-marks';
-
-    // Load the marks list from SharedPreferences
-    List<String>? marksList = prefs.getStringList(marksKey);
+    List<String>? marksList = prefs.getStringList('$filePath-marks');
     marks = marksList?.map((mark) => Duration(seconds: int.parse(mark))).toList() ?? [];
-
     notifyListeners();
   }
-
 }
