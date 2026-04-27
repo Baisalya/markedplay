@@ -4,8 +4,15 @@ import '../core/services/thumbnail_service.dart';
 
 class LocalVideoThumbnail extends StatefulWidget {
   final String path;
+  final double? width;
+  final double? height;
 
-  const LocalVideoThumbnail({super.key, required this.path});
+  const LocalVideoThumbnail({
+    super.key,
+    required this.path,
+    this.width,
+    this.height,
+  });
 
   @override
   State<LocalVideoThumbnail> createState() =>
@@ -49,44 +56,42 @@ class _LocalVideoThumbnailState
 
   @override
   Widget build(BuildContext context) {
+    return Container(
+      width: widget.width,
+      height: widget.height,
+      decoration: BoxDecoration(
+        color: Colors.black12,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: _buildContent(),
+    );
+  }
+
+  Widget _buildContent() {
     if (_loading) {
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.black12,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Center(
-          child: SizedBox(
-            width: 15, 
-            height: 15, 
-            child: CircularProgressIndicator(strokeWidth: 1.5)
-          ),
+      return const Center(
+        child: SizedBox(
+          width: 15,
+          height: 15,
+          child: CircularProgressIndicator(strokeWidth: 1.5),
         ),
       );
     }
 
     if (_thumbPath == null) {
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.black26,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Center(
-          child: Icon(Icons.videocam_off, color: Colors.white24, size: 24)
-        ),
+      return const Center(
+        child: Icon(Icons.videocam_off, color: Colors.white24, size: 24),
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Image.file(
-        File(_thumbPath!),
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-        cacheWidth: 300, // Optimize memory
-        errorBuilder: (context, error, stackTrace) => Container(color: Colors.black12),
-      ),
+    return Image.file(
+      File(_thumbPath!),
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      cacheWidth: 300, // Optimize memory
+      errorBuilder: (context, error, stackTrace) => const SizedBox(),
     );
   }
 }

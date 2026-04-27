@@ -89,68 +89,21 @@ class VideoListScreen extends StatelessWidget {
   // ================= LIST VIEW =================
 
   Widget _buildListView(
-      BuildContext context,
-      List<AssetEntity> videos,
-      AppTheme theme,
-      AppSettingsProvider settings,
-      ) {
+    BuildContext context,
+    List<AssetEntity> videos,
+    AppTheme theme,
+    AppSettingsProvider settings,
+  ) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: videos.length,
       itemBuilder: (_, index) {
-
         final video = videos[index];
-
-        return FutureBuilder<File?>(
-          future: video.file,
-          builder: (_, snapshot) {
-
-            if (!snapshot.hasData) {
-              return const SizedBox();
-            }
-
-            return Container(
-              margin:
-              const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: ThemeHelper.cardColor(
-                  theme,
-                  customColor: settings.customPrimary,
-                ),
-                borderRadius:
-                BorderRadius.circular(16),
-                border: Border.all(
-                  color: ThemeHelper.borderColor(
-                    theme,
-                    customColor:
-                    settings.customPrimary,
-                  ),
-                ),
-              ),
-              child: ListTile(
-                leading: LocalVideoThumbnail(path: snapshot.data!.path),
-                title: Text(
-                  video.title ?? "Video",
-                  style: TextStyle(
-                    color: ThemeHelper
-                        .textPrimary(theme),
-                  ),
-                ),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          VideoPlayerScreen(
-                            filePath:
-                            snapshot.data!.path,
-                          ),
-                    ),
-                  );
-                },
-              ),
-            );
-          },
+        return _VideoListItem(
+          key: ValueKey(video.id),
+          video: video,
+          theme: theme,
+          settings: settings,
         );
       },
     );
@@ -159,96 +112,235 @@ class VideoListScreen extends StatelessWidget {
   // ================= GRID VIEW =================
 
   Widget _buildGridView(
-      BuildContext context,
-      List<AssetEntity> videos,
-      AppTheme theme,
-      AppSettingsProvider settings,
-      ) {
+    BuildContext context,
+    List<AssetEntity> videos,
+    AppTheme theme,
+    AppSettingsProvider settings,
+  ) {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
-      gridDelegate:
-      const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
       itemCount: videos.length,
       itemBuilder: (_, index) {
-
         final video = videos[index];
+        return _VideoGridItem(
+          key: ValueKey(video.id),
+          video: video,
+          theme: theme,
+          settings: settings,
+        );
+      },
+    );
+  }
+}
 
-        return FutureBuilder<File?>(
-          future: video.file,
-          builder: (_, snapshot) {
+class _VideoListItem extends StatefulWidget {
+  final AssetEntity video;
+  final AppTheme theme;
+  final AppSettingsProvider settings;
 
-            if (!snapshot.hasData) {
-              return const SizedBox();
-            }
+  const _VideoListItem({
+    super.key,
+    required this.video,
+    required this.theme,
+    required this.settings,
+  });
 
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        VideoPlayerScreen(
-                          filePath:
-                          snapshot.data!.path,
-                        ),
-                  ),
-                );
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: ThemeHelper.cardColor(
-                    theme,
-                    customColor:
-                    settings.customPrimary,
-                  ),
-                  borderRadius:
-                  BorderRadius.circular(
-                      20),
-                  border: Border.all(
-                    color: ThemeHelper.borderColor(
-                      theme,
-                      customColor:
-                      settings.customPrimary,
+  @override
+  State<_VideoListItem> createState() => _VideoListItemState();
+}
+
+class _VideoListItemState extends State<_VideoListItem> {
+  Future<File?>? _fileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _fileFuture = widget.video.file;
+  }
+
+  @override
+  void didUpdateWidget(covariant _VideoListItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.video.id != widget.video.id) {
+      _fileFuture = widget.video.file;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<File?>(
+      future: _fileFuture,
+      builder: (context, snapshot) {
+        final file = snapshot.data;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: ThemeHelper.cardColor(
+              widget.theme,
+              customColor: widget.settings.customPrimary,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: ThemeHelper.borderColor(
+                widget.theme,
+                customColor: widget.settings.customPrimary,
+              ),
+            ),
+          ),
+          child: ListTile(
+            leading: file == null
+                ? Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ),
-                ),
-                child: Column(
-                  children: [
-
-                    // 🎬 Thumbnail
-                    Expanded(
-                      child: LocalVideoThumbnail(path: snapshot.data!.path),
-                    ),
-
-                    // 🎞 Title
-                    Padding(
-                      padding:
-                      const EdgeInsets
-                          .all(8),
-                      child: Text(
-                        video.title ??
-                            "Video",
-                        maxLines: 1,
-                        overflow:
-                        TextOverflow
-                            .ellipsis,
-                        style:
-                        TextStyle(
-                          color: ThemeHelper
-                              .textPrimary(
-                              theme),
-                        ),
+                    child: const Center(
+                      child: SizedBox(
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(strokeWidth: 1.5),
                       ),
                     ),
-                  ],
+                  )
+                : LocalVideoThumbnail(
+                    path: file.path,
+                    width: 50,
+                    height: 50,
+                  ),
+            title: Text(
+              widget.video.title ?? "Video",
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: ThemeHelper.textPrimary(widget.theme),
+              ),
+            ),
+            onTap: file == null
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VideoPlayerScreen(filePath: file.path),
+                      ),
+                    );
+                  },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _VideoGridItem extends StatefulWidget {
+  final AssetEntity video;
+  final AppTheme theme;
+  final AppSettingsProvider settings;
+
+  const _VideoGridItem({
+    super.key,
+    required this.video,
+    required this.theme,
+    required this.settings,
+  });
+
+  @override
+  State<_VideoGridItem> createState() => _VideoGridItemState();
+}
+
+class _VideoGridItemState extends State<_VideoGridItem> {
+  Future<File?>? _fileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _fileFuture = widget.video.file;
+  }
+
+  @override
+  void didUpdateWidget(covariant _VideoGridItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.video.id != widget.video.id) {
+      _fileFuture = widget.video.file;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<File?>(
+      future: _fileFuture,
+      builder: (context, snapshot) {
+        final file = snapshot.data;
+
+        return GestureDetector(
+          onTap: file == null
+              ? null
+              : () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => VideoPlayerScreen(filePath: file.path),
+                    ),
+                  );
+                },
+          child: Container(
+            decoration: BoxDecoration(
+              color: ThemeHelper.cardColor(
+                widget.theme,
+                customColor: widget.settings.customPrimary,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: ThemeHelper.borderColor(
+                  widget.theme,
+                  customColor: widget.settings.customPrimary,
                 ),
               ),
-            );
-          },
+            ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: file == null
+                      ? Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.black12,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(20),
+                            ),
+                          ),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        )
+                      : LocalVideoThumbnail(path: file.path),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Text(
+                    widget.video.title ?? "Video",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: ThemeHelper.textPrimary(widget.theme),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
