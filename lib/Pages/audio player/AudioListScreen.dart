@@ -90,9 +90,25 @@ class AudioListScreen extends StatelessWidget {
               ),
             ),
             child: ListTile(
-              leading: Icon(
-                Icons.music_note,
-                color: primaryColor,
+              leading: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.black12,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: QueryArtworkWidget(
+                    id: song.id,
+                    type: ArtworkType.AUDIO,
+                    nullArtworkWidget: Icon(
+                      Icons.music_note,
+                      color: primaryColor,
+                    ),
+                    artworkFit: BoxFit.cover,
+                  ),
+                ),
               ),
               title: Text(
                 song.title,

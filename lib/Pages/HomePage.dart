@@ -18,6 +18,9 @@ import '../../core/services/file_browser_service.dart';
 
 import '../../core/services/thumbnail_service.dart';
 import '../../widgets/modern_drawer.dart';
+import 'audio player/Audioplayer.dart';
+import 'audio player/AudioListScreen.dart';
+import 'DirectoryScreen.dart';
 
 import 'DirectoryScreen.dart';
 import 'audio player/AudioListScreen.dart';
@@ -49,6 +52,7 @@ class _HomePageState extends State<HomePage>
   List<FileSystemEntity> _videoRootItems = [];
   List<FileSystemEntity> _audioRootItems = [];
   bool _isLoadingRoot = false;
+  bool _showMiniPlayer = true;
   late AnimationController _bgController;
 
   final String _rootPath = "/storage/emulated/0";
@@ -106,6 +110,7 @@ class _HomePageState extends State<HomePage>
 
     if (_selectedIndex == 1 &&
         _fileBrowserService.isAudioFile(path)) {
+      setState(() => _showMiniPlayer = true);
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -188,8 +193,16 @@ class _HomePageState extends State<HomePage>
           ),
         ],
       ),
-      bottomNavigationBar:
-      _buildBottomNav(theme, settings),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_showMiniPlayer)
+            MiniPlayer(
+              onClose: () => setState(() => _showMiniPlayer = false),
+            ),
+          _buildBottomNav(theme, settings),
+        ],
+      ),
     );
   }
 

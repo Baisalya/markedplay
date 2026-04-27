@@ -7,16 +7,21 @@
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+import 'package:on_audio_query/on_audio_query.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AudioPlayerProvider with ChangeNotifier {
   final AudioPlayer audioPlayer = AudioPlayer();
+  final OnAudioQuery _audioQuery = OnAudioQuery();
   bool isPlaying = false;
   Duration currentPosition = Duration.zero;
   Duration totalDuration = Duration.zero;
   List<Duration> marks = [];
   String loopMode = 'No Loop';
   String? currentFilePath;
+  int? currentSongId;
+  Uint8List? currentArtworkBytes;
 
   AudioPlayerProvider() {
     audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
@@ -54,6 +59,24 @@ class AudioPlayerProvider with ChangeNotifier {
       currentFilePath = filePath;
       await audioPlayer.play(DeviceFileSource(filePath), position: startPosition);
       isPlaying = true;
+
+      // Try to find the song ID and artwork for display
+      try {
+        List<SongModel> songs = await _audioQuery.querySongs();
+        final song = songs.firstWhere((s) => s.data == filePath);
+        currentSongId = song.id;
+        
+        // Fetch artwork bytes once to prevent flickering
+        currentArtworkBytes = await _audioQuery.queryArtwork(
+          song.id,
+          ArtworkType.AUDIO,
+          format: ArtworkFormat.JPEG,
+          size: 200,
+        );
+      } catch (e) {
+        currentSongId = null;
+        currentArtworkBytes = null;
+      }
 
       // Load the marks for this file
       await loadMarks(filePath);
