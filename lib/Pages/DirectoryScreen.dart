@@ -244,10 +244,21 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
       );
     } else {
       if (widget.isVideo && _fileBrowserService.isVideoFile(item.path)) {
+        final videoFiles = items
+            .where((entity) =>
+                entity is File && _fileBrowserService.isVideoFile(entity.path))
+            .map((entity) => entity.path)
+            .toList();
+
+        final initialIndex = videoFiles.indexOf(item.path);
+
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => VideoPlayerScreen(filePath: item.path),
+            builder: (_) => VideoPlayerScreen(
+              playlist: videoFiles,
+              initialIndex: initialIndex != -1 ? initialIndex : 0,
+            ),
           ),
         );
       } else if (!widget.isVideo && _fileBrowserService.isAudioFile(item.path)) {

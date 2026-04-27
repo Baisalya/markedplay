@@ -104,6 +104,8 @@ class VideoListScreen extends StatelessWidget {
           video: video,
           theme: theme,
           settings: settings,
+          playlist: videos,
+          initialIndex: index,
         );
       },
     );
@@ -132,6 +134,8 @@ class VideoListScreen extends StatelessWidget {
           video: video,
           theme: theme,
           settings: settings,
+          playlist: videos,
+          initialIndex: index,
         );
       },
     );
@@ -142,12 +146,16 @@ class _VideoListItem extends StatefulWidget {
   final AssetEntity video;
   final AppTheme theme;
   final AppSettingsProvider settings;
+  final List<AssetEntity> playlist;
+  final int initialIndex;
 
   const _VideoListItem({
     super.key,
     required this.video,
     required this.theme,
     required this.settings,
+    required this.playlist,
+    required this.initialIndex,
   });
 
   @override
@@ -225,13 +233,26 @@ class _VideoListItemState extends State<_VideoListItem> {
             ),
             onTap: file == null
                 ? null
-                : () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => VideoPlayerScreen(filePath: file.path),
-                      ),
+                : () async {
+                    final playlistFiles = await Future.wait(
+                      widget.playlist.map((e) => e.file),
                     );
+                    final validPlaylist = playlistFiles
+                        .where((f) => f != null)
+                        .map((f) => f!.path)
+                        .toList();
+
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => VideoPlayerScreen(
+                            playlist: validPlaylist,
+                            initialIndex: widget.initialIndex,
+                          ),
+                        ),
+                      );
+                    }
                   },
           ),
         );
@@ -244,12 +265,16 @@ class _VideoGridItem extends StatefulWidget {
   final AssetEntity video;
   final AppTheme theme;
   final AppSettingsProvider settings;
+  final List<AssetEntity> playlist;
+  final int initialIndex;
 
   const _VideoGridItem({
     super.key,
     required this.video,
     required this.theme,
     required this.settings,
+    required this.playlist,
+    required this.initialIndex,
   });
 
   @override
@@ -283,13 +308,26 @@ class _VideoGridItemState extends State<_VideoGridItem> {
         return GestureDetector(
           onTap: file == null
               ? null
-              : () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => VideoPlayerScreen(filePath: file.path),
-                    ),
+              : () async {
+                  final playlistFiles = await Future.wait(
+                    widget.playlist.map((e) => e.file),
                   );
+                  final validPlaylist = playlistFiles
+                      .where((f) => f != null)
+                      .map((f) => f!.path)
+                      .toList();
+
+                  if (context.mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VideoPlayerScreen(
+                          playlist: validPlaylist,
+                          initialIndex: widget.initialIndex,
+                        ),
+                      ),
+                    );
+                  }
                 },
           child: Container(
             decoration: BoxDecoration(

@@ -10,9 +10,14 @@ import 'package:volume_controller/volume_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
-  final String filePath;
+  final List<String> playlist;
+  final int initialIndex;
 
-  const VideoPlayerScreen({super.key, required this.filePath});
+  const VideoPlayerScreen({
+    super.key,
+    required this.playlist,
+    this.initialIndex = 0,
+  });
 
   @override
   State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
@@ -21,6 +26,9 @@ class VideoPlayerScreen extends StatefulWidget {
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProviderStateMixin {
   late final Player player = Player();
   late final VideoController controller = VideoController(player);
+
+  late int _currentIndex;
+  String get _currentFilePath => widget.playlist[_currentIndex];
 
   bool _showControls = true;
   Timer? _hideTimer;
@@ -45,6 +53,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
@@ -67,11 +76,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
 
   Future<void> _initialize() async {
     await _initBrightnessAndVolume();
-    player.open(Media(widget.filePath));
+    player.open(Media(_currentFilePath));
     
     // Resume position logic
     final prefs = await SharedPreferences.getInstance();
-    final seconds = prefs.getInt('resume_${widget.filePath}');
+    final seconds = prefs.getInt('resume_$_currentFilePath');
     if (seconds != null) {
       player.stream.duration.listen((duration) {
         if (duration != Duration.zero) {
@@ -81,6 +90,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
     }
 
     _startHideTimer();
+  }
+
+  void _playNext() {
+    if (_currentIndex < widget.playlist.length - 1) {
+      setState(() {
+        _currentIndex++;
+        player.open(Media(_currentFilePath));
+      });
+    }
+  }
+
+  void _playPrevious() {
+    if (_currentIndex > 0) {
+      setState(() {
+        _currentIndex--;
+        player.open(Media(_currentFilePath));
+      });
+    }
   }
 
   Future<void> _initBrightnessAndVolume() async {
@@ -159,7 +186,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
 
   Future<void> _saveLastPosition() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('resume_${widget.filePath}', player.state.position.inSeconds);
+    await prefs.setInt('resume_$_currentFilePath', player.state.position.inSeconds);
   }
 
   // Gesture Handlers
@@ -336,7 +363,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                widget.filePath.split('/').last,
+                _currentFilePath.split('/').last,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -411,9 +438,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildGlassButton(
-                      icon: Icons.replay_10_rounded,
-                      onPressed: () => player.seek(player.state.position - const Duration(seconds: 10)),
-                      size: 50,
+                      icon: Icons.skip_previous_rounded,
+                      onPressed: _currentIndex > 0 ? _playPrevious : null,
+                      size: 48,
+                      color: _currentIndex > 0 
+                          ? Colors.cyanAccent.withOpacity(0.1) 
+                          : Colors.white.withOpacity(0.05),
                     ),
                     const SizedBox(width: 25),
                     StreamBuilder<bool>(
@@ -421,13 +451,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
                       builder: (context, snapshot) {
                         final isPlaying = snapshot.data ?? false;
                         return Container(
+                          height: 64,
+                          width: 64,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.cyanAccent.withOpacity(0.2),
-                            border: Border.all(color: Colors.cyanAccent.withOpacity(0.5), width: 1.5),
+                            gradient: RadialGradient(
+                              colors: [
+                                Colors.cyanAccent.withOpacity(0.3),
+                                Colors.cyanAccent.withOpacity(0.1),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: Colors.cyanAccent.withOpacity(0.5),
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.cyanAccent.withOpacity(0.2),
+                                blurRadius: 15,
+                                spreadRadius: 2,
+                              ),
+                            ],
                           ),
                           child: IconButton(
-                            iconSize: 48,
+                            iconSize: 38,
+                            padding: EdgeInsets.zero,
                             icon: Icon(
                               isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                               color: Colors.white,
@@ -439,9 +487,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
                     ),
                     const SizedBox(width: 25),
                     _buildGlassButton(
-                      icon: Icons.forward_10_rounded,
-                      onPressed: () => player.seek(player.state.position + const Duration(seconds: 10)),
-                      size: 50,
+                      icon: Icons.skip_next_rounded,
+                      onPressed: _currentIndex < widget.playlist.length - 1 ? _playNext : null,
+                      size: 48,
+                      color: _currentIndex < widget.playlist.length - 1 
+                          ? Colors.cyanAccent.withOpacity(0.1) 
+                          : Colors.white.withOpacity(0.05),
                     ),
                   ],
                 ),
@@ -486,7 +537,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
   }
 
   // UI Components
-  Widget _buildGlassButton({required IconData icon, required VoidCallback onPressed, double size = 44, Color? color}) {
+  Widget _buildGlassButton({required IconData icon, VoidCallback? onPressed, double size = 44, Color? color}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(size / 2),
       child: BackdropFilter(

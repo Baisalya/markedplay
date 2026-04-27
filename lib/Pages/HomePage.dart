@@ -102,7 +102,8 @@ class _HomePageState extends State<HomePage>
         context,
         MaterialPageRoute(
           builder: (_) => VideoPlayerScreen(
-            filePath: path,
+            playlist: [path],
+            initialIndex: 0,
           ),
         ),
       );
