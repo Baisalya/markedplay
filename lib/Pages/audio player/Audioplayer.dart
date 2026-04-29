@@ -6,6 +6,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:provider/provider.dart';
 import '../Feature/Scrolltext.dart';
+import '../videoplayer/VideoBackgroundProvider.dart';
+import '../videoplayer/Videoplayer.dart';
 import 'Audioplayerprovider.dart';
 
 class AudioPlayerScreen extends StatefulWidget {
@@ -408,6 +410,8 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with TickerProvid
   }
 }
 
+
+
 class MiniPlayer extends StatelessWidget {
   final VoidCallback onClose;
   const MiniPlayer({Key? key, required this.onClose}) : super(key: key);
@@ -415,25 +419,46 @@ class MiniPlayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final audioProvider = Provider.of<AudioPlayerProvider>(context);
-    if (audioProvider.currentFilePath == null) return const SizedBox.shrink();
+    final videoProvider = Provider.of<VideoBackgroundProvider>(context);
+    
+    final bool isVideo = videoProvider.currentFilePath != null;
+    final String? currentPath = isVideo ? videoProvider.currentFilePath : audioProvider.currentFilePath;
+
+    if (currentPath == null) return const SizedBox.shrink();
 
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => AudioPlayerScreen(
-            filePath: audioProvider.currentFilePath!,
-            startPosition: audioProvider.currentPosition,
-          ),
-        ),
-      ),
+      onTap: () {
+        if (isVideo) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoPlayerScreen(
+                playlist: videoProvider.currentPlaylist ?? [videoProvider.currentFilePath!],
+                initialIndex: videoProvider.currentIndex,
+              ),
+            ),
+          );
+          // Stop background audio when returning to video
+          videoProvider.pauseAudio();
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AudioPlayerScreen(
+                filePath: audioProvider.currentFilePath!,
+                startPosition: audioProvider.currentPosition,
+              ),
+            ),
+          );
+        }
+      },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         height: 75,
         decoration: BoxDecoration(
           color: Colors.grey[900],
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white10),
+          border: Border.all(color: isVideo ? Colors.cyanAccent.withOpacity(0.3) : Colors.white10),
           boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 15, offset: Offset(0, 5))],
         ),
         child: ClipRRect(
@@ -451,18 +476,19 @@ class MiniPlayer extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: audioProvider.currentArtworkBytes != null
+                    child: !isVideo && audioProvider.currentArtworkBytes != null
                         ? Image.memory(
                             audioProvider.currentArtworkBytes!,
                             key: ValueKey(audioProvider.currentFilePath),
                             fit: BoxFit.cover,
                             gaplessPlayback: true,
                           )
-                        : Image.asset(
-                            'assets/songbg/Beautifulsky.jpg',
-                            key: const ValueKey('mini_default_art'),
-                            fit: BoxFit.cover,
-                            gaplessPlayback: true,
+                        : Container(
+                            color: isVideo ? Colors.cyanAccent.withOpacity(0.1) : Colors.transparent,
+                            child: Icon(
+                              isVideo ? Icons.video_library_rounded : Icons.music_note_rounded,
+                              color: isVideo ? Colors.cyanAccent : Colors.white24,
+                            ),
                           ),
                   ),
                 ),
@@ -473,28 +499,42 @@ class MiniPlayer extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        audioProvider.currentFilePath!.split('/').last,
+                        currentPath.split('/').last,
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const Text(
-                        "Now Playing",
-                        style: TextStyle(color: Colors.blueAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                      Text(
+                        isVideo ? "Video playing in BG" : "Now Playing",
+                        style: TextStyle(
+                          color: isVideo ? Colors.cyanAccent : Colors.blueAccent, 
+                          fontSize: 11, 
+                          fontWeight: FontWeight.bold
+                        ),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
                   icon: Icon(
-                    audioProvider.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                    color: Colors.white,
+                    (isVideo ? videoProvider.isPlaying : audioProvider.isPlaying) 
+                        ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                    color: isVideo ? Colors.cyanAccent : Colors.white,
                     size: 35,
                   ),
-                  onPressed: () => audioProvider.playAudio(audioProvider.currentFilePath!),
+                  onPressed: () {
+                    if (isVideo) {
+                      videoProvider.isPlaying ? videoProvider.pauseAudio() : videoProvider.resumeAudio();
+                    } else {
+                      audioProvider.playAudio(audioProvider.currentFilePath!);
+                    }
+                  },
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white54, size: 20),
-                  onPressed: onClose,
+                  onPressed: () {
+                    if (isVideo) videoProvider.stopBackgroundPlayback();
+                    onClose();
+                  },
                 ),
                 const SizedBox(width: 5),
               ],

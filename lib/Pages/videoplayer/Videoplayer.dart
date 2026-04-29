@@ -8,6 +8,9 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import 'VideoBackgroundProvider.dart';
+
 
 class VideoPlayerScreen extends StatefulWidget {
   final List<String> playlist;
@@ -23,7 +26,7 @@ class VideoPlayerScreen extends StatefulWidget {
   State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
 }
 
-class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProviderStateMixin {
+class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   late final Player player = Player();
   late final VideoController controller = VideoController(player);
 
@@ -39,6 +42,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
   bool _isFullScreen = true;
   bool _isExtraMenuOpen = false;
   bool _backgroundPlay = false;
+  bool _inBackgroundMode = false;
   BoxFit _videoFit = BoxFit.contain;
   Timer? _indicatorTimer;
 
@@ -53,6 +57,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentIndex = widget.initialIndex;
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
@@ -76,6 +81,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
 
   Future<void> _initialize() async {
     await _initBrightnessAndVolume();
+    
+    // Stop any existing background playback when opening a new video
+    try {
+      Provider.of<VideoBackgroundProvider>(context, listen: false).stopBackgroundPlayback();
+    } catch (e) {
+      debugPrint("Error stopping background audio: $e");
+    }
+
     player.open(Media(_currentFilePath));
     
     // Resume position logic
@@ -169,6 +182,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (_inBackgroundMode) {
+      try {
+        Provider.of<VideoBackgroundProvider>(context, listen: false).stopBackgroundPlayback();
+      } catch (e) {
+        debugPrint("Error stopping background audio: $e");
+      }
+    }
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -187,6 +208,41 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
   Future<void> _saveLastPosition() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('resume_$_currentFilePath', player.state.position.inSeconds);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_backgroundPlay) return;
+
+    final videoBgProvider = Provider.of<VideoBackgroundProvider>(context, listen: false);
+
+    if (state == AppLifecycleState.paused) {
+      // Transition to background audio when app is minimized
+      // Only transition if the video was actually playing
+      if (player.state.playing) {
+        _inBackgroundMode = true;
+        final currentPosition = player.state.position;
+        player.pause();
+        
+        videoBgProvider.playVideoAsAudio(_currentFilePath, widget.playlist, _currentIndex, startPosition: currentPosition);
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      if (_inBackgroundMode) {
+        // Transition back to video when app is restored
+        final bgPosition = videoBgProvider.currentPosition;
+        final wasPlaying = videoBgProvider.isPlaying;
+        videoBgProvider.pauseAudio();
+        
+        player.seek(bgPosition);
+        if (wasPlaying) {
+          player.play();
+        } else {
+          player.pause();
+        }
+        _inBackgroundMode = false;
+        setState(() {});
+      }
+    }
   }
 
   // Gesture Handlers
@@ -252,9 +308,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: GestureDetector(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop && _backgroundPlay && player.state.playing) {
+          final videoBgProvider = Provider.of<VideoBackgroundProvider>(context, listen: false);
+          // Start background playback as audio
+          videoBgProvider.playVideoAsAudio(
+            _currentFilePath,
+            widget.playlist,
+            _currentIndex,
+            startPosition: player.state.position,
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: GestureDetector(
         onTap: _toggleControls,
         onVerticalDragUpdate: _onVerticalDragUpdate,
         onVerticalDragEnd: (_) => _hideIndicators(),
@@ -303,7 +373,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildLockedUI() {
@@ -537,7 +607,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
   }
 
   // UI Components
-  Widget _buildGlassButton({required IconData icon, VoidCallback? onPressed, double size = 44, Color? color}) {
+  Widget _buildGlassButton({
+    required IconData icon,
+    VoidCallback? onPressed,
+    double size = 44,
+    Color? color,
+    Color? iconColor,
+  }) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(size / 2),
       child: BackdropFilter(
@@ -548,11 +624,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
           decoration: BoxDecoration(
             color: color ?? Colors.white.withOpacity(0.1),
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.5),
+            border: Border.all(
+              color: color?.withOpacity(0.5) ?? Colors.white.withOpacity(0.2),
+              width: 0.5,
+            ),
           ),
           child: IconButton(
             padding: EdgeInsets.zero,
-            icon: Icon(icon, color: Colors.white, size: size * 0.55),
+            icon: Icon(icon, color: iconColor ?? Colors.white, size: size * 0.55),
             onPressed: onPressed,
           ),
         ),
@@ -873,8 +952,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
       bottom: 0,
       child: Center(
         child: SizedBox(
-          width: 180,
-          height: 180,
+          width: 280,
+          height: 280,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -908,7 +987,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
   List<Widget> _buildCircularButtons() {
     final features = [
       {'icon': Icons.speed_rounded, 'label': "${player.state.rate}x", 'onTap': _showPlaybackSpeedMenu},
-      {'icon': _backgroundPlay ? Icons.headphones_rounded : Icons.headphones_outlined, 'label': "BG", 'onTap': () => setState(() => _backgroundPlay = !_backgroundPlay)},
+      {
+        'icon': _backgroundPlay ? Icons.headphones_rounded : Icons.headphones_outlined, 
+        'label': "BG", 
+        'onTap': () => setState(() => _backgroundPlay = !_backgroundPlay),
+        'color': _backgroundPlay ? Colors.cyanAccent : null,
+      },
       {'icon': Icons.picture_in_picture_alt_rounded, 'label': "Pop", 'onTap': () {}},
     ];
 
@@ -935,13 +1019,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
 
           return Transform.translate(
             offset: Offset(x, y),
-            child: Opacity(
-              opacity: _menuAnimation.value.clamp(0.0, 1.0),
-              child: _buildFeatureSubButton(
-                icon: features[index]['icon'] as IconData,
-                label: features[index]['label'] as String,
-                onTap: features[index]['onTap'] as VoidCallback,
-                size: 46,
+            child: IgnorePointer(
+              ignoring: !_isExtraMenuOpen,
+              child: Opacity(
+                opacity: _menuAnimation.value.clamp(0.0, 1.0),
+                child: _buildFeatureSubButton(
+                  icon: features[index]['icon'] as IconData,
+                  label: features[index]['label'] as String,
+                  onTap: features[index]['onTap'] as VoidCallback,
+                  size: 46,
+                  color: features[index]['color'] as Color?,
+                ),
               ),
             ),
           );
@@ -950,22 +1038,38 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
     });
   }
 
-  Widget _buildFeatureSubButton({required IconData icon, required String label, required VoidCallback onTap, double size = 48, Color? color}) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildGlassButton(icon: icon, onPressed: onTap, size: size, color: color?.withOpacity(0.3)),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+  Widget _buildFeatureSubButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    double size = 48,
+    Color? color,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildGlassButton(
+            icon: icon,
+            onPressed: onTap,
+            size: size,
+            color: color?.withOpacity(0.3),
+            iconColor: color,
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color ?? Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

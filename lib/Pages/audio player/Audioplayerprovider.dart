@@ -39,8 +39,10 @@ class AudioPlayerProvider with ChangeNotifier {
       notifyListeners();
     });
     _audioHandler.mediaItem.listen((item) {
-      totalDuration = item?.duration ?? Duration.zero;
-      notifyListeners();
+      if (item != null && item.extras?['type'] != 'video') {
+        totalDuration = item.duration ?? Duration.zero;
+        notifyListeners();
+      }
     });
   }
 
@@ -128,6 +130,10 @@ class AudioPlayerProvider with ChangeNotifier {
       );
 
       await _audioHandler.setAudioSource(filePath, mediaItem);
+      // Clear video background if it was playing
+      // Note: VideoBackgroundProvider will be used for video, so we don't clear it here directly 
+      // but the UI/Notification will switch.
+
       if (startPosition != Duration.zero) await _audioHandler.seek(startPosition);
       await _audioHandler.play();
       await loadMarks(filePath);

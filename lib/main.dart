@@ -11,6 +11,7 @@ import 'Pages/audio player/Audioplayer.dart';
 import 'Pages/HomePage.dart';
 import 'Pages/audio player/Audioplayerprovider.dart';
 import 'Pages/videoplayer/Videoplayer.dart';
+import 'Pages/videoplayer/VideoBackgroundProvider.dart';
 import 'core/app_settings_provider.dart';
 
 import 'core/services/thumbnail_service.dart';
@@ -50,6 +51,7 @@ class _MyAppState extends State<MyApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AudioPlayerProvider(_audioHandler)),
+        ChangeNotifierProvider(create: (_) => VideoBackgroundProvider(_audioHandler)),
         ChangeNotifierProvider(create: (_) => AppSettingsProvider()),
       ],
       child: MaterialApp(

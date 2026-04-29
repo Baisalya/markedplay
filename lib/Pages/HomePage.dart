@@ -18,14 +18,13 @@ import '../../core/services/file_browser_service.dart';
 
 import '../../core/services/thumbnail_service.dart';
 import '../../widgets/modern_drawer.dart';
+import 'audio player/AudioHandler.dart';
 import 'audio player/Audioplayer.dart';
 import 'audio player/AudioListScreen.dart';
 import 'DirectoryScreen.dart';
 
-import 'DirectoryScreen.dart';
-import 'audio player/AudioListScreen.dart';
-import 'audio player/Audioplayer.dart';
 import 'audio player/Audioplayerprovider.dart';
+import 'videoplayer/VideoBackgroundProvider.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -63,6 +62,7 @@ class _HomePageState extends State<HomePage>
   void initState() {
     super.initState();
     _initMedia();
+    _setupNotificationListener();
 
     _bgController = AnimationController(
       vsync: this,
@@ -91,6 +91,38 @@ class _HomePageState extends State<HomePage>
   void dispose() {
     _bgController.dispose();
     super.dispose();
+  }
+
+  void _setupNotificationListener() {
+    MyAudioHandler.notificationClickStream.listen((_) {
+      if (!mounted) return;
+      
+      final videoProvider = Provider.of<VideoBackgroundProvider>(context, listen: false);
+      final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+
+      if (videoProvider.currentFilePath != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VideoPlayerScreen(
+              playlist: videoProvider.currentPlaylist ?? [videoProvider.currentFilePath!],
+              initialIndex: videoProvider.currentIndex,
+            ),
+          ),
+        );
+        videoProvider.pauseAudio();
+      } else if (audioProvider.currentFilePath != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AudioPlayerScreen(
+              filePath: audioProvider.currentFilePath!,
+              startPosition: audioProvider.currentPosition,
+            ),
+          ),
+        );
+      }
+    });
   }
 
   // ================= FILE OPENER =================

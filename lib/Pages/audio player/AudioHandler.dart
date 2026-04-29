@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 
 class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   final _player = AudioPlayer();
+  static final _notificationClickController = StreamController<bool>.broadcast();
+  static Stream<bool> get notificationClickStream => _notificationClickController.stream;
 
   MyAudioHandler() {
     _player.playbackEventStream.map(_transformEvent).listen((state) {
@@ -71,6 +74,12 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
       speed: _player.speed,
       queueIndex: event.currentIndex,
     );
+  }
+
+  @override
+  Future<void> click([MediaButton button = MediaButton.media]) async {
+    _notificationClickController.add(true);
+    super.click(button);
   }
 
   AudioPlayer get player => _player;
