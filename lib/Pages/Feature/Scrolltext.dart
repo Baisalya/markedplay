@@ -19,7 +19,7 @@ class AutoScrollText extends StatefulWidget {
 
 class _AutoScrollTextState extends State<AutoScrollText> {
   late ScrollController _scrollController;
-  late Timer _timer;
+  Timer? _timer;
   double _textWidth = 0;
 
   @override
@@ -31,29 +31,46 @@ class _AutoScrollTextState extends State<AutoScrollText> {
 
   @override
   void dispose() {
+    _timer?.cancel();
     _scrollController.dispose();
-    _timer.cancel();
     super.dispose();
   }
 
   void _startScrolling() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final textKey = GlobalKey();
-      final textWidget = Text(widget.text, style: widget.style, key: textKey);
+      if (!mounted) return;
 
-      // Render the text widget to get its width
-      final textRenderBox = textKey.currentContext?.findRenderObject() as RenderBox?;
-      if (textRenderBox != null) {
-        _textWidth = textRenderBox.size.width;
-        _scrollController.jumpTo(0);
-        _timer = Timer.periodic(widget.scrollDuration, (timer) {
-          _scrollController.animateTo(
-            _scrollController.offset >= _textWidth ? 0 : _scrollController.offset + _textWidth,
-            duration: Duration(milliseconds: 500),
-            curve: Curves.linear,
-          );
-        });
-      }
+      final TextPainter textPainter = TextPainter(
+        text: TextSpan(text: widget.text, style: widget.style),
+        maxLines: 1,
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      setState(() {
+        _textWidth = textPainter.size.width;
+      });
+
+      _timer = Timer.periodic(widget.scrollDuration, (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        if (_scrollController.hasClients) {
+          double maxScrollExtent = _scrollController.position.maxScrollExtent;
+          double nextOffset = _scrollController.offset + 50.0; // Scroll by 50 units
+
+          if (nextOffset > maxScrollExtent) {
+            nextOffset = 0;
+            _scrollController.jumpTo(0);
+          } else {
+            _scrollController.animateTo(
+              nextOffset,
+              duration: widget.scrollDuration,
+              curve: Curves.linear,
+            );
+          }
+        }
+      });
     });
   }
 

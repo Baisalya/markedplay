@@ -22,21 +22,27 @@ class AudioPlayerProvider with ChangeNotifier {
   
   List<SongModel> _playlist = [];
   int _currentIndex = -1;
+  DateTime? _sleepTimerEndTime;
 
   AudioProcessingState _processingState = AudioProcessingState.idle;
 
+  DateTime? get sleepTimerEndTime => _sleepTimerEndTime;
+
   AudioPlayerProvider(this._audioHandler) {
     _audioHandler.playbackState.listen((state) {
-      isPlaying = state.playing;
+      final isAudio = _audioHandler.mediaItem.value?.extras?['type'] != 'video';
+      isPlaying = state.playing && isAudio;
       _processingState = state.processingState;
-      if (state.processingState == AudioProcessingState.completed) {
+      if (state.processingState == AudioProcessingState.completed && isAudio) {
         _handleSongCompletion();
       }
       notifyListeners();
     });
     AudioService.position.listen((position) {
-      currentPosition = position;
-      notifyListeners();
+      if (_audioHandler.mediaItem.value?.extras?['type'] != 'video') {
+        currentPosition = position;
+        notifyListeners();
+      }
     });
     _audioHandler.mediaItem.listen((item) {
       if (item != null && item.extras?['type'] != 'video') {
@@ -44,6 +50,22 @@ class AudioPlayerProvider with ChangeNotifier {
         notifyListeners();
       }
     });
+  }
+
+  void setSleepTimer(Duration? duration) {
+    if (duration == null) {
+      _sleepTimerEndTime = null;
+    } else {
+      _sleepTimerEndTime = DateTime.now().add(duration);
+      Future.delayed(duration, () {
+        if (_sleepTimerEndTime != null && DateTime.now().isAfter(_sleepTimerEndTime!)) {
+          pauseAudio();
+          _sleepTimerEndTime = null;
+          notifyListeners();
+        }
+      });
+    }
+    notifyListeners();
   }
 
   void updatePlaylist(List<SongModel> songs) {
@@ -74,17 +96,19 @@ class AudioPlayerProvider with ChangeNotifier {
   }
 
   Future<void> playAudio(String filePath, {Duration startPosition = Duration.zero}) async {
-    if (isPlaying && currentFilePath == filePath) {
+    final bool isVideoActive = _audioHandler.mediaItem.value?.extras?['type'] == 'video';
+
+    if (isPlaying && currentFilePath == filePath && !isVideoActive) {
       await _audioHandler.pause();
-    } else if (!isPlaying && currentFilePath == filePath) {
+    } else if (!isPlaying && currentFilePath == filePath && !isVideoActive) {
       if (_processingState == AudioProcessingState.completed) {
         await _audioHandler.seek(Duration.zero);
       }
       await _audioHandler.play();
     } else {
       currentFilePath = filePath;
+      currentPosition = startPosition;
       
-      // Update index if in playlist
       if (_playlist.isNotEmpty) {
         _currentIndex = _playlist.indexWhere((s) => s.data == filePath);
       }
@@ -95,6 +119,14 @@ class AudioPlayerProvider with ChangeNotifier {
       Duration? duration;
 
       try {
+        final file = File(filePath);
+        if (!await file.exists()) {
+           currentSongId = null;
+           currentArtworkBytes = null;
+           notifyListeners();
+           return; 
+        }
+
         List<SongModel> songs = _playlist.isNotEmpty ? _playlist : await _audioQuery.querySongs();
         final song = songs.firstWhere((s) => s.data == filePath, orElse: () => songs.first);
         currentSongId = song.id;
@@ -130,10 +162,6 @@ class AudioPlayerProvider with ChangeNotifier {
       );
 
       await _audioHandler.setAudioSource(filePath, mediaItem);
-      // Clear video background if it was playing
-      // Note: VideoBackgroundProvider will be used for video, so we don't clear it here directly 
-      // but the UI/Notification will switch.
-
       if (startPosition != Duration.zero) await _audioHandler.seek(startPosition);
       await _audioHandler.play();
       await loadMarks(filePath);
@@ -142,12 +170,23 @@ class AudioPlayerProvider with ChangeNotifier {
   }
 
   Future<void> pauseAudio() async => await _audioHandler.pause();
+
+  Future<void> stopAudio({bool stopPlayer = true}) async {
+    if (stopPlayer) {
+      await _audioHandler.stop();
+    }
+    currentFilePath = null;
+    currentArtworkBytes = null;
+    notifyListeners();
+  }
+
   Future<void> seekAudio(Duration position) async {
     Duration target = position;
     if (target < Duration.zero) target = Duration.zero;
     if (totalDuration > Duration.zero && target > totalDuration) target = totalDuration;
     await _audioHandler.seek(target);
   }
+
   void setLoopMode(String mode) { loopMode = mode; notifyListeners(); }
 
   Future<void> markPosition(String filePath) async {

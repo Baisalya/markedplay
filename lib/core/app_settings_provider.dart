@@ -9,6 +9,8 @@ class AppSettingsProvider extends ChangeNotifier {
   ViewMode _viewMode = ViewMode.grid;
   SortMode _sortMode = SortMode.name;
   BrowseMode _browseMode = BrowseMode.allFolders;
+  List<String> _favorites = [];
+  List<String> _recentlyPlayed = [];
 
   Color _customPrimary = Colors.blueAccent;
 
@@ -17,6 +19,8 @@ class AppSettingsProvider extends ChangeNotifier {
   SortMode get sortMode => _sortMode;
   BrowseMode get browseMode => _browseMode;
   Color get customPrimary => _customPrimary;
+  List<String> get favorites => _favorites;
+  List<String> get recentlyPlayed => _recentlyPlayed;
 
   AppSettingsProvider() {
     _loadSettings();
@@ -42,6 +46,9 @@ class AppSettingsProvider extends ChangeNotifier {
     _customPrimary = Color(
         prefs.getInt("customPrimary") ??
             Colors.blueAccent.value);
+
+    _favorites = prefs.getStringList("favorites") ?? [];
+    _recentlyPlayed = prefs.getStringList("recentlyPlayed") ?? [];
 
     notifyListeners();
   }
@@ -85,6 +92,29 @@ class AppSettingsProvider extends ChangeNotifier {
     _sortMode = mode;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt("sortMode", mode.index);
+    notifyListeners();
+  }
+
+  // ================= FAVORITES & RECENT =================
+
+  Future<void> toggleFavorite(String path) async {
+    if (_favorites.contains(path)) {
+      _favorites.remove(path);
+    } else {
+      _favorites.add(path);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList("favorites", _favorites);
+    notifyListeners();
+  }
+
+  Future<void> addRecentlyPlayed(String path) async {
+    _recentlyPlayed.remove(path);
+    _recentlyPlayed.insert(0, path);
+    if (_recentlyPlayed.length > 20) _recentlyPlayed.removeLast();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList("recentlyPlayed", _recentlyPlayed);
     notifyListeners();
   }
 }

@@ -9,17 +9,22 @@ import 'package:screen_brightness/screen_brightness.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import '../audio player/Audioplayerprovider.dart';
 import 'VideoBackgroundProvider.dart';
+import '../../widgets/modern_widgets.dart';
 
 
 class VideoPlayerScreen extends StatefulWidget {
   final List<String> playlist;
   final int initialIndex;
+  final Duration? initialPosition;
 
   const VideoPlayerScreen({
     super.key,
     required this.playlist,
     this.initialIndex = 0,
+    this.initialPosition,
   });
 
   @override
@@ -82,27 +87,52 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
   Future<void> _initialize() async {
     await _initBrightnessAndVolume();
     
-    // Stop any existing background playback when opening a new video
-    try {
-      Provider.of<VideoBackgroundProvider>(context, listen: false).stopBackgroundPlayback();
-    } catch (e) {
-      debugPrint("Error stopping background audio: $e");
+    Duration? startPos = widget.initialPosition;
+
+    // Stop and save background playback before starting new one
+    final bgProvider = Provider.of<VideoBackgroundProvider>(context, listen: false);
+    final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+
+    // Stop audio player provider if it's playing
+    if (audioProvider.isPlaying) {
+      await audioProvider.pauseAudio();
     }
+
+    if (bgProvider.currentFilePath == _currentFilePath) {
+      // If we are returning from background of the SAME file, take its position
+      startPos ??= bgProvider.currentPosition;
+      await bgProvider.stopBackgroundPlayback();
+    } else {
+      // Stop any other background playback
+      await bgProvider.stopBackgroundPlayback();
+    }
+
+    if (!mounted) return;
 
     player.open(Media(_currentFilePath));
     
     // Resume position logic
-    final prefs = await SharedPreferences.getInstance();
-    final seconds = prefs.getInt('resume_$_currentFilePath');
-    if (seconds != null) {
-      player.stream.duration.listen((duration) {
-        if (duration != Duration.zero) {
-           player.seek(Duration(seconds: seconds));
-        }
-      });
+    if (startPos != null && startPos != Duration.zero) {
+      _seekToInitialPosition(startPos);
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      final seconds = prefs.getInt('resume_$_currentFilePath');
+      if (seconds != null) {
+        _seekToInitialPosition(Duration(seconds: seconds));
+      }
     }
 
     _startHideTimer();
+  }
+
+  void _seekToInitialPosition(Duration position) {
+    late StreamSubscription sub;
+    sub = player.stream.duration.listen((duration) {
+      if (duration != Duration.zero && mounted) {
+        player.seek(position);
+        sub.cancel();
+      }
+    });
   }
 
   void _playNext() {
@@ -641,23 +671,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
 
   Widget _buildCircularIndicator(IconData icon, double value, Color color) {
     return Center(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.black54,
-          shape: BoxShape.circle,
-          border: Border.all(color: color.withOpacity(0.5), width: 2),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.white, size: 40),
-            const SizedBox(height: 8),
-            Text(
-              "${(value * 100).toInt()}%",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
-            ),
-          ],
+      child: GlassCard(
+        borderRadius: 100,
+        blur: 15,
+        color: Colors.black.withOpacity(0.3),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 40),
+              const SizedBox(height: 8),
+              Text(
+                "${(value * 100).toInt()}%",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -720,18 +750,38 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with TickerProvid
     _showModernBottomSheet(
       title: "Subtitles",
       icon: Icons.subtitles_rounded,
-      child: ListView.builder(
-        shrinkWrap: true,
-        itemCount: tracks.length,
-        itemBuilder: (context, i) => ListTile(
-          leading: Icon(Icons.closed_caption_rounded, color: player.state.track.subtitle == tracks[i] ? Colors.cyanAccent : Colors.white60),
-          title: Text(tracks[i].title ?? "Subtitle ${i + 1}", style: TextStyle(color: player.state.track.subtitle == tracks[i] ? Colors.cyanAccent : Colors.white)),
-          subtitle: Text(tracks[i].language ?? "Unknown Language", style: const TextStyle(color: Colors.white38)),
-          onTap: () {
-            player.setSubtitleTrack(tracks[i]);
-            Navigator.pop(context);
-          },
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.file_open_rounded, color: Colors.cyanAccent),
+            title: const Text("Load External Subtitle", style: TextStyle(color: Colors.white)),
+            onTap: () async {
+              Navigator.pop(context);
+              FilePickerResult? result = await FilePicker.platform.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: ['srt', 'vtt', 'ass'],
+              );
+              if (result != null && result.files.single.path != null) {
+                player.setSubtitleTrack(SubtitleTrack.uri(result.files.single.path!));
+              }
+            },
+          ),
+          const Divider(color: Colors.white10),
+          ListView.builder(
+            shrinkWrap: true,
+            itemCount: tracks.length,
+            itemBuilder: (context, i) => ListTile(
+              leading: Icon(Icons.closed_caption_rounded, color: player.state.track.subtitle == tracks[i] ? Colors.cyanAccent : Colors.white60),
+              title: Text(tracks[i].title ?? "Subtitle ${i + 1}", style: TextStyle(color: player.state.track.subtitle == tracks[i] ? Colors.cyanAccent : Colors.white)),
+              subtitle: Text(tracks[i].language ?? "Unknown Language", style: const TextStyle(color: Colors.white38)),
+              onTap: () {
+                player.setSubtitleTrack(tracks[i]);
+                Navigator.pop(context);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

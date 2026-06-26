@@ -2,6 +2,15 @@ import 'package:flutter/material.dart';
 import 'media_enums.dart';
 
 class ThemeHelper {
+  // Constants for consistent UI
+  static const double radiusExtraLarge = 35.0;
+  static const double radiusLarge = 25.0;
+  static const double radiusMedium = 16.0;
+  static const double radiusSmall = 12.0;
+
+  static const double paddingLarge = 24.0;
+  static const double paddingMedium = 16.0;
+  static const double paddingSmall = 8.0;
 
   // ================= PRIMARY COLOR =================
 

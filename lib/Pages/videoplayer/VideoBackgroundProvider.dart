@@ -16,8 +16,10 @@ class VideoBackgroundProvider with ChangeNotifier {
   
   VideoBackgroundProvider(this._audioHandler) {
     _audioHandler.playbackState.listen((state) {
-      isPlaying = state.playing;
-      if (state.processingState == AudioProcessingState.idle && !state.playing) {
+      final isVideo = _audioHandler.mediaItem.value?.extras?['type'] == 'video';
+      isPlaying = state.playing && isVideo;
+      
+      if (state.processingState == AudioProcessingState.idle && !state.playing && isVideo) {
         if (currentFilePath != null) {
           _saveCurrentPosition();
         }
@@ -26,8 +28,10 @@ class VideoBackgroundProvider with ChangeNotifier {
       notifyListeners();
     });
     AudioService.position.listen((position) {
-      currentPosition = position;
-      notifyListeners();
+      if (_audioHandler.mediaItem.value?.extras?['type'] == 'video') {
+        currentPosition = position;
+        notifyListeners();
+      }
     });
     _audioHandler.mediaItem.listen((item) {
       if (item != null && item.extras?['type'] == 'video') {
@@ -42,6 +46,7 @@ class VideoBackgroundProvider with ChangeNotifier {
     currentFilePath = filePath;
     currentPlaylist = playlist;
     currentIndex = index;
+    currentPosition = startPosition;
     String title = filePath.split('/').last;
 
     final mediaItem = MediaItem(
@@ -70,10 +75,12 @@ class VideoBackgroundProvider with ChangeNotifier {
     }
   }
 
-  Future<void> stopBackgroundPlayback() async {
+  Future<void> stopBackgroundPlayback({bool stopPlayer = true}) async {
     if (currentFilePath != null) {
       await _saveCurrentPosition();
-      await _audioHandler.stop();
+      if (stopPlayer) {
+        await _audioHandler.stop();
+      }
       currentFilePath = null;
       currentPlaylist = null;
       notifyListeners();
@@ -81,5 +88,20 @@ class VideoBackgroundProvider with ChangeNotifier {
   }
 
   Future<void> pauseAudio() async => await _audioHandler.pause();
-  Future<void> resumeAudio() async => await _audioHandler.play();
+  Future<void> resumeAudio() async {
+    final bool isVideoActive = _audioHandler.mediaItem.value?.extras?['type'] == 'video';
+    final bool isCorrectFile = _audioHandler.mediaItem.value?.id == currentFilePath;
+
+    if (isVideoActive && isCorrectFile) {
+      await _audioHandler.play();
+    } else if (currentFilePath != null) {
+      // Re-assert video source if it was swapped out by music
+      await playVideoAsAudio(
+        currentFilePath!,
+        currentPlaylist ?? [currentFilePath!],
+        currentIndex,
+        startPosition: currentPosition,
+      );
+    }
+  }
 }
