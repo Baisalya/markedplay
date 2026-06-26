@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../Pages/Settings/SettingsScreen.dart';
+import '../Pages/Tools/ToolsScreen.dart';
 import '../core/app_settings_provider.dart';
 import '../core/media_enums.dart';
 import '../core/theme_helper.dart';
@@ -175,11 +176,30 @@ class ModernDrawer extends StatelessWidget {
                   title: "Settings",
                   selected: false,
                   onTap: () {
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) =>
                         const SettingsScreen(),
+                      ),
+                    );
+                  },
+                  theme: theme,
+                  settings: settings,
+                ),
+
+                _drawerTile(
+                  icon: Icons.build_rounded,
+                  title: "Tools",
+                  selected: false,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                        const ToolsScreen(),
                       ),
                     );
                   },

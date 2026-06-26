@@ -1,19 +1,57 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'media_enums.dart';
 
 class AppSettingsProvider extends ChangeNotifier {
-
+  // --- UI Settings ---
   AppTheme _theme = AppTheme.neon;
   ViewMode _viewMode = ViewMode.grid;
   SortMode _sortMode = SortMode.name;
   BrowseMode _browseMode = BrowseMode.allFolders;
+  Color _customPrimary = Colors.blueAccent;
   List<String> _favorites = [];
   List<String> _recentlyPlayed = [];
 
-  Color _customPrimary = Colors.blueAccent;
+  // --- Playback Settings ---
+  BackgroundPlayMode _backgroundPlayMode = BackgroundPlayMode.off;
+  bool _resumeLastPosition = true;
+  bool _autoPlayNext = true;
+  RepeatMode _repeatMode = RepeatMode.off;
+  bool _shuffle = false;
+  double _defaultPlaybackSpeed = 1.0;
+  bool _rememberSpeedPerFile = false;
+  int _seekStep = 10; // seconds
+  bool _doubleTapSeek = true;
+  bool _pauseOnHeadphonesDisconnected = true;
+  bool _keepScreenAwake = true;
+  bool _lockControlsDuringPlayback = false;
 
+  // --- Video Settings ---
+  DecoderMode _decoderMode = DecoderMode.auto;
+  AspectRatioMode _defaultAspectRatio = AspectRatioMode.fit;
+  bool _autoRotateVideo = true;
+  bool _rememberOrientationPerVideo = false;
+  bool _brightnessGesture = true;
+  bool _volumeGesture = true;
+  bool _seekGesture = true;
+
+  // --- Audio Settings ---
+  bool _resumeLastPositionAudio = true;
+  bool _rememberLastPlayedSong = true;
+
+  // --- Subtitle Settings ---
+  bool _showSubtitles = true;
+  bool _autoLoadSubtitles = true;
+  double _subtitleSize = 18.0;
+  int _subtitleColorValue = Colors.white.value;
+  int _subtitleBackgroundColorValue = Colors.black45.value;
+  String _subtitleEncoding = 'utf-8';
+
+  // --- Library Settings ---
+  bool _showHiddenFiles = false;
+
+  // --- Getters ---
   AppTheme get theme => _theme;
   ViewMode get viewMode => _viewMode;
   SortMode get sortMode => _sortMode;
@@ -21,6 +59,39 @@ class AppSettingsProvider extends ChangeNotifier {
   Color get customPrimary => _customPrimary;
   List<String> get favorites => _favorites;
   List<String> get recentlyPlayed => _recentlyPlayed;
+
+  BackgroundPlayMode get backgroundPlayMode => _backgroundPlayMode;
+  bool get resumeLastPosition => _resumeLastPosition;
+  bool get autoPlayNext => _autoPlayNext;
+  RepeatMode get repeatMode => _repeatMode;
+  bool get shuffle => _shuffle;
+  double get defaultPlaybackSpeed => _defaultPlaybackSpeed;
+  bool get rememberSpeedPerFile => _rememberSpeedPerFile;
+  int get seekStep => _seekStep;
+  bool get doubleTapSeek => _doubleTapSeek;
+  bool get pauseOnHeadphonesDisconnected => _pauseOnHeadphonesDisconnected;
+  bool get keepScreenAwake => _keepScreenAwake;
+  bool get lockControlsDuringPlayback => _lockControlsDuringPlayback;
+
+  DecoderMode get decoderMode => _decoderMode;
+  AspectRatioMode get defaultAspectRatio => _defaultAspectRatio;
+  bool get autoRotateVideo => _autoRotateVideo;
+  bool get rememberOrientationPerVideo => _rememberOrientationPerVideo;
+  bool get brightnessGesture => _brightnessGesture;
+  bool get volumeGesture => _volumeGesture;
+  bool get seekGesture => _seekGesture;
+
+  bool get resumeLastPositionAudio => _resumeLastPositionAudio;
+  bool get rememberLastPlayedSong => _rememberLastPlayedSong;
+
+  bool get showSubtitles => _showSubtitles;
+  bool get autoLoadSubtitles => _autoLoadSubtitles;
+  double get subtitleSize => _subtitleSize;
+  Color get subtitleColor => Color(_subtitleColorValue);
+  Color get subtitleBackgroundColor => Color(_subtitleBackgroundColorValue);
+  String get subtitleEncoding => _subtitleEncoding;
+
+  bool get showHiddenFiles => _showHiddenFiles;
 
   AppSettingsProvider() {
     _loadSettings();
@@ -31,72 +102,105 @@ class AppSettingsProvider extends ChangeNotifier {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
 
-    _theme = AppTheme.values[
-    prefs.getInt("theme") ?? 0];
-
-    _viewMode = ViewMode.values[
-    prefs.getInt("viewMode") ?? 0];
-
-    _sortMode = SortMode.values[
-    prefs.getInt("sortMode") ?? 0];
-
-    _browseMode = BrowseMode.values[
-    prefs.getInt("browseMode") ?? 0];
-
-    _customPrimary = Color(
-        prefs.getInt("customPrimary") ??
-            Colors.blueAccent.value);
-
+    _theme = AppTheme.values[prefs.getInt("theme") ?? 0];
+    _viewMode = ViewMode.values[prefs.getInt("viewMode") ?? 0];
+    _sortMode = SortMode.values[prefs.getInt("sortMode") ?? 0];
+    _browseMode = BrowseMode.values[prefs.getInt("browseMode") ?? 0];
+    _customPrimary = Color(prefs.getInt("customPrimary") ?? Colors.blueAccent.value);
     _favorites = prefs.getStringList("favorites") ?? [];
     _recentlyPlayed = prefs.getStringList("recentlyPlayed") ?? [];
 
+    _backgroundPlayMode = BackgroundPlayMode.values[prefs.getInt("backgroundPlayMode") ?? 0];
+    _resumeLastPosition = prefs.getBool("resumeLastPosition") ?? true;
+    _autoPlayNext = prefs.getBool("autoPlayNext") ?? true;
+    _repeatMode = RepeatMode.values[prefs.getInt("repeatMode") ?? 0];
+    _shuffle = prefs.getBool("shuffle") ?? false;
+    _defaultPlaybackSpeed = prefs.getDouble("defaultPlaybackSpeed") ?? 1.0;
+    _rememberSpeedPerFile = prefs.getBool("rememberSpeedPerFile") ?? false;
+    _seekStep = prefs.getInt("seekStep") ?? 10;
+    _doubleTapSeek = prefs.getBool("doubleTapSeek") ?? true;
+    _pauseOnHeadphonesDisconnected = prefs.getBool("pauseOnHeadphonesDisconnected") ?? true;
+    _keepScreenAwake = prefs.getBool("keepScreenAwake") ?? true;
+    _lockControlsDuringPlayback = prefs.getBool("lockControlsDuringPlayback") ?? false;
+
+    _decoderMode = DecoderMode.values[prefs.getInt("decoderMode") ?? 0];
+    _defaultAspectRatio = AspectRatioMode.values[prefs.getInt("defaultAspectRatio") ?? 0];
+    _autoRotateVideo = prefs.getBool("autoRotateVideo") ?? true;
+    _rememberOrientationPerVideo = prefs.getBool("rememberOrientationPerVideo") ?? false;
+    _brightnessGesture = prefs.getBool("brightnessGesture") ?? true;
+    _volumeGesture = prefs.getBool("volumeGesture") ?? true;
+    _seekGesture = prefs.getBool("seekGesture") ?? true;
+
+    _resumeLastPositionAudio = prefs.getBool("resumeLastPositionAudio") ?? true;
+    _rememberLastPlayedSong = prefs.getBool("rememberLastPlayedSong") ?? true;
+
+    _showSubtitles = prefs.getBool("showSubtitles") ?? true;
+    _autoLoadSubtitles = prefs.getBool("autoLoadSubtitles") ?? true;
+    _subtitleSize = prefs.getDouble("subtitleSize") ?? 18.0;
+    _subtitleColorValue = prefs.getInt("subtitleColor") ?? Colors.white.value;
+    _subtitleBackgroundColorValue = prefs.getInt("subtitleBackgroundColor") ?? Colors.black45.value;
+    _subtitleEncoding = prefs.getString("subtitleEncoding") ?? 'utf-8';
+
+    _showHiddenFiles = prefs.getBool("showHiddenFiles") ?? false;
+
     notifyListeners();
   }
 
-  // ================= BROWSE MODE =================
+  // ================= SETTERS =================
 
+  Future<void> _setBool(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+    notifyListeners();
+  }
+
+  Future<void> _setInt(String key, int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(key, value);
+    notifyListeners();
+  }
+
+  Future<void> _setDouble(String key, double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(key, value);
+    notifyListeners();
+  }
+
+  Future<void> _setString(String key, String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, value);
+    notifyListeners();
+  }
+
+  // BROWSE MODE
   Future<void> setBrowseMode(BrowseMode mode) async {
     _browseMode = mode;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt("browseMode", mode.index);
-    notifyListeners();
+    await _setInt("browseMode", mode.index);
   }
 
-  // ================= THEME =================
-
+  // THEME
   Future<void> setTheme(AppTheme theme) async {
     _theme = theme;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt("theme", theme.index);
-    notifyListeners();
+    await _setInt("theme", theme.index);
   }
 
   Future<void> setCustomColor(Color color) async {
     _customPrimary = color;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(
-        "customPrimary", color.value);
-    notifyListeners();
+    await _setInt("customPrimary", color.value);
   }
 
-  // ================= VIEW =================
-
+  // VIEW
   Future<void> setViewMode(ViewMode mode) async {
     _viewMode = mode;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt("viewMode", mode.index);
-    notifyListeners();
+    await _setInt("viewMode", mode.index);
   }
 
   Future<void> setSortMode(SortMode mode) async {
     _sortMode = mode;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt("sortMode", mode.index);
-    notifyListeners();
+    await _setInt("sortMode", mode.index);
   }
 
-  // ================= FAVORITES & RECENT =================
-
+  // FAVORITES & RECENT
   Future<void> toggleFavorite(String path) async {
     if (_favorites.contains(path)) {
       _favorites.remove(path);
@@ -116,5 +220,157 @@ class AppSettingsProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList("recentlyPlayed", _recentlyPlayed);
     notifyListeners();
+  }
+
+  Future<void> clearRecentlyPlayed() async {
+    _recentlyPlayed.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList("recentlyPlayed", _recentlyPlayed);
+    notifyListeners();
+  }
+
+  // PLAYBACK SETTERS
+  Future<void> setBackgroundPlayMode(BackgroundPlayMode mode) async {
+    _backgroundPlayMode = mode;
+    await _setInt("backgroundPlayMode", mode.index);
+  }
+
+  Future<void> setResumeLastPosition(bool value) async {
+    _resumeLastPosition = value;
+    await _setBool("resumeLastPosition", value);
+  }
+
+  Future<void> setAutoPlayNext(bool value) async {
+    _autoPlayNext = value;
+    await _setBool("autoPlayNext", value);
+  }
+
+  Future<void> setRepeatMode(RepeatMode mode) async {
+    _repeatMode = mode;
+    await _setInt("repeatMode", mode.index);
+  }
+
+  Future<void> setShuffle(bool value) async {
+    _shuffle = value;
+    await _setBool("shuffle", value);
+  }
+
+  Future<void> setDefaultPlaybackSpeed(double value) async {
+    _defaultPlaybackSpeed = value;
+    await _setDouble("defaultPlaybackSpeed", value);
+  }
+
+  Future<void> setRememberSpeedPerFile(bool value) async {
+    _rememberSpeedPerFile = value;
+    await _setBool("rememberSpeedPerFile", value);
+  }
+
+  Future<void> setSeekStep(int value) async {
+    _seekStep = value;
+    await _setInt("seekStep", value);
+  }
+
+  Future<void> setDoubleTapSeek(bool value) async {
+    _doubleTapSeek = value;
+    await _setBool("doubleTapSeek", value);
+  }
+
+  Future<void> setPauseOnHeadphonesDisconnected(bool value) async {
+    _pauseOnHeadphonesDisconnected = value;
+    await _setBool("pauseOnHeadphonesDisconnected", value);
+  }
+
+  Future<void> setKeepScreenAwake(bool value) async {
+    _keepScreenAwake = value;
+    await _setBool("keepScreenAwake", value);
+  }
+
+  Future<void> setLockControlsDuringPlayback(bool value) async {
+    _lockControlsDuringPlayback = value;
+    await _setBool("lockControlsDuringPlayback", value);
+  }
+
+  // VIDEO SETTERS
+  Future<void> setDecoderMode(DecoderMode mode) async {
+    _decoderMode = mode;
+    await _setInt("decoderMode", mode.index);
+  }
+
+  Future<void> setDefaultAspectRatio(AspectRatioMode mode) async {
+    _defaultAspectRatio = mode;
+    await _setInt("defaultAspectRatio", mode.index);
+  }
+
+  Future<void> setAutoRotateVideo(bool value) async {
+    _autoRotateVideo = value;
+    await _setBool("autoRotateVideo", value);
+  }
+
+  Future<void> setRememberOrientationPerVideo(bool value) async {
+    _rememberOrientationPerVideo = value;
+    await _setBool("rememberOrientationPerVideo", value);
+  }
+
+  Future<void> setBrightnessGesture(bool value) async {
+    _brightnessGesture = value;
+    await _setBool("brightnessGesture", value);
+  }
+
+  Future<void> setVolumeGesture(bool value) async {
+    _volumeGesture = value;
+    await _setBool("volumeGesture", value);
+  }
+
+  Future<void> setSeekGesture(bool value) async {
+    _seekGesture = value;
+    await _setBool("seekGesture", value);
+  }
+
+  // AUDIO SETTERS
+  Future<void> setResumeLastPositionAudio(bool value) async {
+    _resumeLastPositionAudio = value;
+    await _setBool("resumeLastPositionAudio", value);
+  }
+
+  Future<void> setRememberLastPlayedSong(bool value) async {
+    _rememberLastPlayedSong = value;
+    await _setBool("rememberLastPlayedSong", value);
+  }
+
+  // SUBTITLE SETTERS
+  Future<void> setShowSubtitles(bool value) async {
+    _showSubtitles = value;
+    await _setBool("showSubtitles", value);
+  }
+
+  Future<void> setAutoLoadSubtitles(bool value) async {
+    _autoLoadSubtitles = value;
+    await _setBool("autoLoadSubtitles", value);
+  }
+
+  Future<void> setSubtitleSize(double value) async {
+    _subtitleSize = value;
+    await _setDouble("subtitleSize", value);
+  }
+
+  Future<void> setSubtitleColor(Color color) async {
+    _subtitleColorValue = color.value;
+    await _setInt("subtitleColor", color.value);
+  }
+
+  Future<void> setSubtitleBackgroundColor(Color color) async {
+    _subtitleBackgroundColorValue = color.value;
+    await _setInt("subtitleBackgroundColor", color.value);
+  }
+
+  Future<void> setSubtitleEncoding(String encoding) async {
+    _subtitleEncoding = encoding;
+    await _setString("subtitleEncoding", encoding);
+  }
+
+  // LIBRARY SETTERS
+  Future<void> setShowHiddenFiles(bool value) async {
+    _showHiddenFiles = value;
+    await _setBool("showHiddenFiles", value);
   }
 }

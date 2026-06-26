@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../widgets/modern_widgets.dart';
 import '../Feature/Scrolltext.dart';
 import '../videoplayer/VideoBackgroundProvider.dart';
+import '../../core/app_settings_provider.dart';
 import 'QueueScreen.dart';
 import 'Audioplayerprovider.dart';
 
@@ -37,7 +38,10 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with TickerProvid
     } catch (e) {}
 
     final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
-    audioProvider.playAudio(widget.filePath, startPosition: widget.startPosition);
+    final settings = Provider.of<AppSettingsProvider>(context, listen: false);
+    
+    final startPos = settings.resumeLastPositionAudio ? widget.startPosition : Duration.zero;
+    audioProvider.playAudio(widget.filePath, startPosition: startPos);
 
     _vinylController = AnimationController(
       vsync: this,
@@ -319,7 +323,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with TickerProvid
           size: 64,
           iconSize: 32,
         ),
-        ModernIconButton(
+         ModernIconButton(
           icon: Icons.repeat_rounded,
           onPressed: () {
              final current = provider.loopMode;
@@ -331,6 +335,38 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with TickerProvid
           color: provider.loopMode == 'No Loop' ? Colors.white38 : Colors.blueAccent,
         ),
       ],
+    );
+  }
+
+  Widget _buildTopBar(AudioPlayerProvider provider) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          ModernIconButton(
+            icon: Icons.arrow_back_ios_new_rounded,
+            onPressed: () => Navigator.pop(context),
+            size: 44,
+          ),
+          Row(
+            children: [
+              ModernIconButton(
+                icon: Icons.timer_rounded,
+                onPressed: _showSleepTimerPicker,
+                size: 44,
+                color: provider.sleepTimerEndTime != null ? Colors.blueAccent : Colors.white70,
+              ),
+              const SizedBox(width: 10),
+              ModernIconButton(
+                icon: Icons.queue_music_rounded,
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QueueScreen())),
+                size: 44,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
