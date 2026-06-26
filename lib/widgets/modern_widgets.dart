@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:on_audio_query/on_audio_query.dart';
 
 class GlassCard extends StatelessWidget {
   final Widget child;
@@ -139,6 +140,90 @@ class EmptyStateWidget extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class SongTile extends StatelessWidget {
+  final SongModel song;
+  final VoidCallback onTap;
+  final Widget? trailing;
+  final bool isPlaying;
+
+  const SongTile({
+    super.key,
+    required this.song,
+    required this.onTap,
+    this.trailing,
+    this.isPlaying = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      leading: AlbumArt(
+        id: song.id,
+        type: ArtworkType.AUDIO,
+        size: 50,
+      ),
+      title: Text(
+        song.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: isPlaying ? Colors.blueAccent : Colors.white,
+          fontWeight: isPlaying ? FontWeight.bold : FontWeight.w600,
+        ),
+      ),
+      subtitle: Text(
+        song.artist ?? "Unknown Artist",
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: Colors.white54, fontSize: 12),
+      ),
+      trailing: trailing ?? (isPlaying ? const Icon(Icons.bar_chart_rounded, color: Colors.blueAccent) : null),
+    );
+  }
+}
+
+class AlbumArt extends StatelessWidget {
+  final int id;
+  final ArtworkType type;
+  final double size;
+  final double borderRadius;
+
+  const AlbumArt({
+    super.key,
+    required this.id,
+    required this.type,
+    this.size = 50,
+    this.borderRadius = 12,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return QueryArtworkWidget(
+      id: id,
+      type: type,
+      artworkBorder: BorderRadius.circular(borderRadius),
+      artworkWidth: size,
+      artworkHeight: size,
+      artworkFit: BoxFit.cover,
+      nullArtworkWidget: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: Icon(
+          type == ArtworkType.AUDIO ? Icons.music_note_rounded : Icons.album_rounded,
+          color: Colors.white24,
+          size: size * 0.5,
         ),
       ),
     );

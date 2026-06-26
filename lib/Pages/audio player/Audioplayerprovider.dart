@@ -27,6 +27,7 @@ class AudioPlayerProvider with ChangeNotifier {
   AudioProcessingState _processingState = AudioProcessingState.idle;
 
   DateTime? get sleepTimerEndTime => _sleepTimerEndTime;
+  List<SongModel> getPlaylist() => _playlist;
 
   AudioPlayerProvider(this._audioHandler) {
     _audioHandler.playbackState.listen((state) {

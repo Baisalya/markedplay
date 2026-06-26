@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:markedplay/widgets/modern_widgets.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:provider/provider.dart';
 
@@ -20,250 +21,146 @@ class AudioListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     final settings = context.watch<AppSettingsProvider>();
     final theme = settings.theme;
 
-    final primaryColor = ThemeHelper.primary(
-      theme,
-      customColor: settings.customPrimary,
-    );
-
-    final backgroundColor = ThemeHelper.background(
-      theme,
-      customColor: settings.customPrimary,
-    );
-
     final sortedSongs = [...songs];
-
-    // 🔥 Global Sorting
     if (settings.sortMode == SortMode.name) {
-      sortedSongs.sort(
-              (a, b) => a.title.compareTo(b.title));
+      sortedSongs.sort((a, b) => a.title.compareTo(b.title));
     }
 
     return Scaffold(
-      backgroundColor: backgroundColor,
-
+      extendBodyBehindAppBar: true,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: ThemeHelper.appBarColor(
-          theme,
-          customColor: settings.customPrimary,
-        ),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         title: Text(
           albumName,
-          style: TextStyle(
-            color: primaryColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 22,
+            letterSpacing: 1,
           ),
         ),
-        iconTheme: IconThemeData(color: primaryColor),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
-
-      // ================= LIST VIEW =================
-
-      body: settings.viewMode == ViewMode.list
-          ? ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: sortedSongs.length,
-        itemBuilder: (_, index) {
-
-          final song = sortedSongs[index];
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 10),
+      body: Stack(
+        children: [
+          Container(
             decoration: BoxDecoration(
-              color: ThemeHelper.cardColor(
+              gradient: ThemeHelper.backgroundGradient(
                 theme,
                 customColor: settings.customPrimary,
               ),
-              borderRadius:
-              BorderRadius.circular(16),
-              border: Border.all(
-                color: ThemeHelper.borderColor(
-                  theme,
-                  customColor: settings.customPrimary,
-                ),
-              ),
             ),
-            child: ListTile(
-              leading: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: Colors.black12,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: QueryArtworkWidget(
-                    id: song.id,
-                    type: ArtworkType.AUDIO,
-                    nullArtworkWidget: Icon(
-                      Icons.music_note,
-                      color: primaryColor,
-                    ),
-                    artworkFit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              title: Text(
-                song.title,
-                style: TextStyle(
-                  color: ThemeHelper.textPrimary(
-                    theme,
-                  ),
-                ),
-              ),
-              subtitle: Text(
-                song.artist ?? "Unknown Artist",
-                style: TextStyle(
-                  color: ThemeHelper.textSecondary(
-                    theme,
-                  ),
-                ),
-              ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        AudioPlayerScreen(
-                          filePath: song.data,
-                          startPosition:
-                          Provider.of<
-                              AudioPlayerProvider>(
-                              context,
-                              listen: false)
-                              .currentPosition,
+          ),
+          SafeArea(
+            child: sortedSongs.isEmpty
+                ? const EmptyStateWidget(
+                    icon: Icons.music_note_rounded,
+                    title: "No songs in this album",
+                    subtitle: "This folder seems to be empty.",
+                  )
+                : settings.viewMode == ViewMode.list
+                    ? ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        itemCount: sortedSongs.length,
+                        itemBuilder: (_, index) {
+                          final song = sortedSongs[index];
+                          final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+                          return SongTile(
+                            song: song,
+                            isPlaying: audioProvider.currentFilePath == song.data,
+                            onTap: () {
+                              audioProvider.updatePlaylist(sortedSongs);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AudioPlayerScreen(
+                                    filePath: song.data,
+                                    startPosition: audioProvider.currentPosition,
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      )
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(20),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 20,
+                          mainAxisSpacing: 20,
+                          childAspectRatio: 0.8,
                         ),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      )
-
-      // ================= GRID VIEW =================
-
-          : GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate:
-        const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.85,
-        ),
-        itemCount: sortedSongs.length,
-        itemBuilder: (_, index) {
-
-          final song = sortedSongs[index];
-
-          return GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      AudioPlayerScreen(
-                        filePath: song.data,
-                        startPosition:
-                        Provider.of<
-                            AudioPlayerProvider>(
-                            context,
-                            listen: false)
-                            .currentPosition,
+                        itemCount: sortedSongs.length,
+                        itemBuilder: (_, index) {
+                          final song = sortedSongs[index];
+                          final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+                          return GestureDetector(
+                            onTap: () {
+                              audioProvider.updatePlaylist(sortedSongs);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AudioPlayerScreen(
+                                    filePath: song.data,
+                                    startPosition: audioProvider.currentPosition,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: GlassCard(
+                              borderRadius: 20,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: AlbumArt(
+                                      id: song.id,
+                                      type: ArtworkType.AUDIO,
+                                      borderRadius: 20,
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          song.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          song.artist ?? "Unknown Artist",
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.white54,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                ),
-              );
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                color: ThemeHelper.cardColor(
-                  theme,
-                  customColor: settings.customPrimary,
-                ),
-                borderRadius:
-                BorderRadius.circular(20),
-                border: Border.all(
-                  color: ThemeHelper.borderColor(
-                    theme,
-                    customColor:
-                    settings.customPrimary,
-                  ),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.stretch,
-                children: [
-
-                  // 🎵 Artwork
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius:
-                      const BorderRadius.vertical(
-                          top: Radius.circular(20)),
-                      child:
-                      QueryArtworkWidget(
-                        id: song.id,
-                        type: ArtworkType.AUDIO,
-                        nullArtworkWidget: Icon(
-                          Icons.music_note,
-                          size: 50,
-                          color: primaryColor,
-                        ),
-                        artworkFit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-
-                  // 🎼 Title Section
-                  Padding(
-                    padding:
-                    const EdgeInsets.all(8),
-                    child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          song.title,
-                          maxLines: 2,
-                          overflow:
-                          TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: ThemeHelper
-                                .textPrimary(theme),
-                            fontWeight:
-                            FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          song.artist ??
-                              "Unknown Artist",
-                          maxLines: 1,
-                          overflow:
-                          TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: ThemeHelper
-                                .textSecondary(theme),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

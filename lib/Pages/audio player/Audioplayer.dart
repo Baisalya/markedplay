@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../widgets/modern_widgets.dart';
 import '../Feature/Scrolltext.dart';
 import '../videoplayer/VideoBackgroundProvider.dart';
+import 'QueueScreen.dart';
 import 'Audioplayerprovider.dart';
 
 class AudioPlayerScreen extends StatefulWidget {
@@ -107,6 +108,10 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with TickerProvid
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.queue_music_rounded, color: Colors.white),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QueueScreen())),
+          ),
           IconButton(
             icon: const Icon(Icons.palette_rounded, color: Colors.white),
             onPressed: _changeBackgroundImage,
@@ -285,9 +290,16 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with TickerProvid
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         ModernIconButton(
-          icon: Icons.replay_10_rounded,
-          onPressed: () => provider.seekAudio(provider.currentPosition - const Duration(seconds: 10)),
-          size: 56,
+          icon: Icons.shuffle_rounded,
+          onPressed: () {}, // Future shuffle logic
+          size: 48,
+          color: Colors.white38,
+        ),
+        ModernIconButton(
+          icon: Icons.skip_previous_rounded,
+          onPressed: () => provider.playPrevious(),
+          size: 64,
+          iconSize: 32,
         ),
         GestureDetector(
           onTap: () => provider.playAudio(widget.filePath),
@@ -302,9 +314,21 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> with TickerProvid
           ),
         ),
         ModernIconButton(
-          icon: Icons.forward_10_rounded,
-          onPressed: () => provider.seekAudio(provider.currentPosition + const Duration(seconds: 10)),
-          size: 56,
+          icon: Icons.skip_next_rounded,
+          onPressed: () => provider.playNext(),
+          size: 64,
+          iconSize: 32,
+        ),
+        ModernIconButton(
+          icon: Icons.repeat_rounded,
+          onPressed: () {
+             final current = provider.loopMode;
+             if (current == 'No Loop') provider.setLoopMode('Loop All');
+             else if (current == 'Loop All') provider.setLoopMode('Loop One');
+             else provider.setLoopMode('No Loop');
+          },
+          size: 48,
+          color: provider.loopMode == 'No Loop' ? Colors.white38 : Colors.blueAccent,
         ),
       ],
     );

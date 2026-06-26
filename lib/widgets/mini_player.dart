@@ -1,10 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:on_audio_query/on_audio_query.dart';
 import 'package:provider/provider.dart';
 import '../Pages/audio player/Audioplayerprovider.dart';
 import '../Pages/videoplayer/VideoBackgroundProvider.dart';
 import '../Pages/audio player/Audioplayer.dart';
 import '../Pages/videoplayer/Videoplayer.dart';
+import 'modern_widgets.dart';
 
 class MultiMiniPlayer extends StatefulWidget {
   const MultiMiniPlayer({Key? key}) : super(key: key);
@@ -188,6 +190,21 @@ class _MultiMiniPlayerState extends State<MultiMiniPlayer> {
     final String? currentPath = provider.currentFilePath;
     if (currentPath == null) return const SizedBox.shrink();
     
+    String title = currentPath.split('/').last.split('.').first;
+    String subtitle = isVideo ? "Video Background" : "Music Playing";
+    
+    if (!isVideo && provider is AudioPlayerProvider) {
+      final playlist = provider.getPlaylist();
+      if (playlist.isNotEmpty) {
+        final song = playlist.firstWhere(
+          (s) => s.data == currentPath,
+          orElse: () => playlist.first,
+        );
+        title = song.title;
+        subtitle = song.artist ?? "Unknown Artist";
+      }
+    }
+
     return Container(
       height: 70,
       decoration: BoxDecoration(
@@ -249,7 +266,7 @@ class _MultiMiniPlayerState extends State<MultiMiniPlayer> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        currentPath.split('/').last,
+                        title,
                         style: TextStyle(
                           color: Colors.white, 
                           fontWeight: FontWeight.bold, 
@@ -258,12 +275,13 @@ class _MultiMiniPlayerState extends State<MultiMiniPlayer> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        isVideo ? "Video Background" : "Music Playing",
+                        subtitle,
                         style: TextStyle(
-                          color: isVideo ? Colors.cyanAccent : Colors.blueAccent, 
+                          color: isVideo ? Colors.cyanAccent : Colors.white54, 
                           fontSize: isTop ? 10 : 9, 
-                          fontWeight: FontWeight.bold
+                          fontWeight: FontWeight.w500
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -316,25 +334,32 @@ class _MultiMiniPlayerState extends State<MultiMiniPlayer> {
 
   Widget _buildArtwork(dynamic provider, bool isVideo) {
     return Container(
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 5,
+            offset: Offset(0, 2),
+          )
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: !isVideo && provider is AudioPlayerProvider && provider.currentArtworkBytes != null
-            ? Image.memory(
-                provider.currentArtworkBytes!,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
+        borderRadius: BorderRadius.circular(12),
+        child: !isVideo && provider is AudioPlayerProvider
+            ? AlbumArt(
+                id: provider.currentSongId ?? 0,
+                type: ArtworkType.AUDIO,
+                size: 44,
               )
             : Container(
                 color: isVideo ? Colors.cyanAccent.withOpacity(0.1) : Colors.blueAccent.withOpacity(0.1),
                 child: Icon(
                   isVideo ? Icons.video_library_rounded : Icons.music_note_rounded,
                   color: isVideo ? Colors.cyanAccent : Colors.blueAccent,
-                  size: 20,
+                  size: 22,
                 ),
               ),
       ),

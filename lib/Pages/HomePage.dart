@@ -25,6 +25,7 @@ import 'audio player/AudioListScreen.dart';
 import 'DirectoryScreen.dart';
 import '../widgets/mini_player.dart';
 
+import '../widgets/SearchDelegate.dart';
 import 'audio player/Audioplayerprovider.dart';
 import 'videoplayer/VideoBackgroundProvider.dart';
 
@@ -251,7 +252,19 @@ class _HomePageState extends State<HomePage>
               ),
               IconButton(
                 icon: const Icon(Icons.search_rounded, color: Colors.white70),
-                onPressed: () {},
+                onPressed: () async {
+                  if (_selectedIndex == 1) {
+                    final songs = await _audioService.getAllSongs();
+                    if (!mounted) return;
+                    showSearch(
+                      context: context,
+                      delegate: MediaSearchDelegate(
+                        songs: songs,
+                        onFileTap: _openFile,
+                      ),
+                    );
+                  }
+                },
               ),
               IconButton(
                 icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
@@ -445,12 +458,21 @@ class _HomePageState extends State<HomePage>
       builder: (_, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final songs = snapshot.data!;
-        return _buildFileUI(
-          titles: songs.map((e) => e.title).toList(),
-          icon: Icons.music_note_rounded,
-          onTap: (index) => _openFile(songs[index].data),
-          theme: theme,
-          settings: settings,
+        if (songs.isEmpty) return const EmptyStateWidget(icon: Icons.music_note_rounded, title: "No Songs Found", subtitle: "We couldn't find any audio files on your device.");
+        
+        final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          itemCount: songs.length,
+          itemBuilder: (_, index) => SongTile(
+            song: songs[index],
+            isPlaying: audioProvider.currentFilePath == songs[index].data,
+            onTap: () {
+              audioProvider.updatePlaylist(songs);
+              _openFile(songs[index].data);
+            },
+          ),
         );
       },
     );
