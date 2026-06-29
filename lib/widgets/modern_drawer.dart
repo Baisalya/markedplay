@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../Pages/Settings/SettingsScreen.dart';
 import '../Pages/Tools/ToolsScreen.dart';
+import '../Pages/Library/SavedMediaScreen.dart';
 import '../core/app_settings_provider.dart';
 import '../core/media_enums.dart';
 import '../core/theme_helper.dart';
@@ -24,7 +25,6 @@ class ModernDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     final settings = context.watch<AppSettingsProvider>();
     final theme = settings.theme;
 
@@ -63,7 +63,6 @@ class ModernDrawer extends StatelessWidget {
             ),
             child: ListView(
               children: [
-
                 // ================= TITLE =================
 
                 Text(
@@ -111,10 +110,8 @@ class ModernDrawer extends StatelessWidget {
                 _drawerTile(
                   icon: Icons.grid_view,
                   title: "Grid View",
-                  selected:
-                  currentViewMode == ViewMode.grid,
-                  onTap: () =>
-                      onViewChanged(ViewMode.grid),
+                  selected: currentViewMode == ViewMode.grid,
+                  onTap: () => onViewChanged(ViewMode.grid),
                   theme: theme,
                   settings: settings,
                 ),
@@ -122,10 +119,8 @@ class ModernDrawer extends StatelessWidget {
                 _drawerTile(
                   icon: Icons.list,
                   title: "List View",
-                  selected:
-                  currentViewMode == ViewMode.list,
-                  onTap: () =>
-                      onViewChanged(ViewMode.list),
+                  selected: currentViewMode == ViewMode.list,
+                  onTap: () => onViewChanged(ViewMode.list),
                   theme: theme,
                   settings: settings,
                 ),
@@ -137,10 +132,8 @@ class ModernDrawer extends StatelessWidget {
                 _drawerTile(
                   icon: Icons.sort_by_alpha,
                   title: "Name",
-                  selected:
-                  currentSortMode == SortMode.name,
-                  onTap: () =>
-                      onSortChanged(SortMode.name),
+                  selected: currentSortMode == SortMode.name,
+                  onTap: () => onSortChanged(SortMode.name),
                   theme: theme,
                   settings: settings,
                 ),
@@ -148,10 +141,8 @@ class ModernDrawer extends StatelessWidget {
                 _drawerTile(
                   icon: Icons.date_range,
                   title: "Date",
-                  selected:
-                  currentSortMode == SortMode.date,
-                  onTap: () =>
-                      onSortChanged(SortMode.date),
+                  selected: currentSortMode == SortMode.date,
+                  onTap: () => onSortChanged(SortMode.date),
                   theme: theme,
                   settings: settings,
                 ),
@@ -159,10 +150,8 @@ class ModernDrawer extends StatelessWidget {
                 _drawerTile(
                   icon: Icons.storage,
                   title: "Size",
-                  selected:
-                  currentSortMode == SortMode.size,
-                  onTap: () =>
-                      onSortChanged(SortMode.size),
+                  selected: currentSortMode == SortMode.size,
+                  onTap: () => onSortChanged(SortMode.size),
                   theme: theme,
                   settings: settings,
                 ),
@@ -170,6 +159,44 @@ class ModernDrawer extends StatelessWidget {
                 const SizedBox(height: 30),
 
                 _sectionTitle("More", theme),
+
+                _drawerTile(
+                  icon: Icons.favorite_rounded,
+                  title: "Favorites",
+                  selected: false,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SavedMediaScreen(
+                          view: SavedMediaView.favorites,
+                        ),
+                      ),
+                    );
+                  },
+                  theme: theme,
+                  settings: settings,
+                ),
+
+                _drawerTile(
+                  icon: Icons.history_rounded,
+                  title: "Recent",
+                  selected: false,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SavedMediaScreen(
+                          view: SavedMediaView.recent,
+                        ),
+                      ),
+                    );
+                  },
+                  theme: theme,
+                  settings: settings,
+                ),
 
                 _drawerTile(
                   icon: Icons.settings,
@@ -180,8 +207,7 @@ class ModernDrawer extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                        const SettingsScreen(),
+                        builder: (_) => const SettingsScreen(),
                       ),
                     );
                   },
@@ -198,8 +224,7 @@ class ModernDrawer extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                        const ToolsScreen(),
+                        builder: (_) => const ToolsScreen(),
                       ),
                     );
                   },
@@ -226,9 +251,9 @@ class ModernDrawer extends StatelessWidget {
   // ================= SECTION TITLE =================
 
   Widget _sectionTitle(
-      String title,
-      AppTheme theme,
-      ) {
+    String title,
+    AppTheme theme,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
@@ -252,7 +277,6 @@ class ModernDrawer extends StatelessWidget {
     required AppTheme theme,
     required AppSettingsProvider settings,
   }) {
-
     final primaryColor = ThemeHelper.primary(
       theme,
       customColor: settings.customPrimary,
@@ -263,23 +287,17 @@ class ModernDrawer extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
-        color: selected
-            ? primaryColor.withOpacity(0.2)
-            : Colors.transparent,
+        color: selected ? primaryColor.withOpacity(0.2) : Colors.transparent,
       ),
       child: ListTile(
         leading: Icon(
           icon,
-          color: selected
-              ? primaryColor
-              : ThemeHelper.textPrimary(theme),
+          color: selected ? primaryColor : ThemeHelper.textPrimary(theme),
         ),
         title: Text(
           title,
           style: TextStyle(
-            color: selected
-                ? primaryColor
-                : ThemeHelper.textPrimary(theme),
+            color: selected ? primaryColor : ThemeHelper.textPrimary(theme),
           ),
         ),
         onTap: onTap,

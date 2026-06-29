@@ -15,13 +15,10 @@ class LocalVideoThumbnail extends StatefulWidget {
   });
 
   @override
-  State<LocalVideoThumbnail> createState() =>
-      _LocalVideoThumbnailState();
+  State<LocalVideoThumbnail> createState() => _LocalVideoThumbnailState();
 }
 
-class _LocalVideoThumbnailState
-    extends State<LocalVideoThumbnail> {
-  
+class _LocalVideoThumbnailState extends State<LocalVideoThumbnail> {
   String? _thumbPath;
   bool _loading = true;
   final _service = ThumbnailService();
@@ -43,9 +40,9 @@ class _LocalVideoThumbnailState
   Future<void> _load() async {
     if (!mounted) return;
     setState(() => _loading = true);
-    
+
     final path = await _service.getThumbnail(widget.path);
-    
+
     if (mounted) {
       setState(() {
         _thumbPath = path;

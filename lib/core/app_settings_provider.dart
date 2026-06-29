@@ -44,8 +44,8 @@ class AppSettingsProvider extends ChangeNotifier {
   bool _showSubtitles = true;
   bool _autoLoadSubtitles = true;
   double _subtitleSize = 18.0;
-  int _subtitleColorValue = Colors.white.value;
-  int _subtitleBackgroundColorValue = Colors.black45.value;
+  int _subtitleColorValue = Colors.white.toARGB32();
+  int _subtitleBackgroundColorValue = Colors.black45.toARGB32();
   String _subtitleEncoding = 'utf-8';
 
   // --- Library Settings ---
@@ -57,8 +57,8 @@ class AppSettingsProvider extends ChangeNotifier {
   SortMode get sortMode => _sortMode;
   BrowseMode get browseMode => _browseMode;
   Color get customPrimary => _customPrimary;
-  List<String> get favorites => _favorites;
-  List<String> get recentlyPlayed => _recentlyPlayed;
+  List<String> get favorites => List.unmodifiable(_favorites);
+  List<String> get recentlyPlayed => List.unmodifiable(_recentlyPlayed);
 
   BackgroundPlayMode get backgroundPlayMode => _backgroundPlayMode;
   bool get resumeLastPosition => _resumeLastPosition;
@@ -102,31 +102,67 @@ class AppSettingsProvider extends ChangeNotifier {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
 
-    _theme = AppTheme.values[prefs.getInt("theme") ?? 0];
-    _viewMode = ViewMode.values[prefs.getInt("viewMode") ?? 0];
-    _sortMode = SortMode.values[prefs.getInt("sortMode") ?? 0];
-    _browseMode = BrowseMode.values[prefs.getInt("browseMode") ?? 0];
-    _customPrimary = Color(prefs.getInt("customPrimary") ?? Colors.blueAccent.value);
+    _theme = _enumFromIndex(
+      AppTheme.values,
+      prefs.getInt("theme"),
+      AppTheme.neon,
+    );
+    _viewMode = _enumFromIndex(
+      ViewMode.values,
+      prefs.getInt("viewMode"),
+      ViewMode.grid,
+    );
+    _sortMode = _enumFromIndex(
+      SortMode.values,
+      prefs.getInt("sortMode"),
+      SortMode.name,
+    );
+    _browseMode = _enumFromIndex(
+      BrowseMode.values,
+      prefs.getInt("browseMode"),
+      BrowseMode.allFolders,
+    );
+    _customPrimary =
+        Color(prefs.getInt("customPrimary") ?? Colors.blueAccent.toARGB32());
     _favorites = prefs.getStringList("favorites") ?? [];
     _recentlyPlayed = prefs.getStringList("recentlyPlayed") ?? [];
 
-    _backgroundPlayMode = BackgroundPlayMode.values[prefs.getInt("backgroundPlayMode") ?? 0];
+    _backgroundPlayMode = _enumFromIndex(
+      BackgroundPlayMode.values,
+      prefs.getInt("backgroundPlayMode"),
+      BackgroundPlayMode.off,
+    );
     _resumeLastPosition = prefs.getBool("resumeLastPosition") ?? true;
     _autoPlayNext = prefs.getBool("autoPlayNext") ?? true;
-    _repeatMode = RepeatMode.values[prefs.getInt("repeatMode") ?? 0];
+    _repeatMode = _enumFromIndex(
+      RepeatMode.values,
+      prefs.getInt("repeatMode"),
+      RepeatMode.off,
+    );
     _shuffle = prefs.getBool("shuffle") ?? false;
     _defaultPlaybackSpeed = prefs.getDouble("defaultPlaybackSpeed") ?? 1.0;
     _rememberSpeedPerFile = prefs.getBool("rememberSpeedPerFile") ?? false;
     _seekStep = prefs.getInt("seekStep") ?? 10;
     _doubleTapSeek = prefs.getBool("doubleTapSeek") ?? true;
-    _pauseOnHeadphonesDisconnected = prefs.getBool("pauseOnHeadphonesDisconnected") ?? true;
+    _pauseOnHeadphonesDisconnected =
+        prefs.getBool("pauseOnHeadphonesDisconnected") ?? true;
     _keepScreenAwake = prefs.getBool("keepScreenAwake") ?? true;
-    _lockControlsDuringPlayback = prefs.getBool("lockControlsDuringPlayback") ?? false;
+    _lockControlsDuringPlayback =
+        prefs.getBool("lockControlsDuringPlayback") ?? false;
 
-    _decoderMode = DecoderMode.values[prefs.getInt("decoderMode") ?? 0];
-    _defaultAspectRatio = AspectRatioMode.values[prefs.getInt("defaultAspectRatio") ?? 0];
+    _decoderMode = _enumFromIndex(
+      DecoderMode.values,
+      prefs.getInt("decoderMode"),
+      DecoderMode.auto,
+    );
+    _defaultAspectRatio = _enumFromIndex(
+      AspectRatioMode.values,
+      prefs.getInt("defaultAspectRatio"),
+      AspectRatioMode.fit,
+    );
     _autoRotateVideo = prefs.getBool("autoRotateVideo") ?? true;
-    _rememberOrientationPerVideo = prefs.getBool("rememberOrientationPerVideo") ?? false;
+    _rememberOrientationPerVideo =
+        prefs.getBool("rememberOrientationPerVideo") ?? false;
     _brightnessGesture = prefs.getBool("brightnessGesture") ?? true;
     _volumeGesture = prefs.getBool("volumeGesture") ?? true;
     _seekGesture = prefs.getBool("seekGesture") ?? true;
@@ -137,13 +173,26 @@ class AppSettingsProvider extends ChangeNotifier {
     _showSubtitles = prefs.getBool("showSubtitles") ?? true;
     _autoLoadSubtitles = prefs.getBool("autoLoadSubtitles") ?? true;
     _subtitleSize = prefs.getDouble("subtitleSize") ?? 18.0;
-    _subtitleColorValue = prefs.getInt("subtitleColor") ?? Colors.white.value;
-    _subtitleBackgroundColorValue = prefs.getInt("subtitleBackgroundColor") ?? Colors.black45.value;
+    _subtitleColorValue =
+        prefs.getInt("subtitleColor") ?? Colors.white.toARGB32();
+    _subtitleBackgroundColorValue =
+        prefs.getInt("subtitleBackgroundColor") ?? Colors.black45.toARGB32();
     _subtitleEncoding = prefs.getString("subtitleEncoding") ?? 'utf-8';
 
     _showHiddenFiles = prefs.getBool("showHiddenFiles") ?? false;
 
     notifyListeners();
+  }
+
+  T _enumFromIndex<T extends Enum>(
+    List<T> values,
+    int? index,
+    T fallback,
+  ) {
+    if (index == null || index < 0 || index >= values.length) {
+      return fallback;
+    }
+    return values[index];
   }
 
   // ================= SETTERS =================
@@ -186,7 +235,7 @@ class AppSettingsProvider extends ChangeNotifier {
 
   Future<void> setCustomColor(Color color) async {
     _customPrimary = color;
-    await _setInt("customPrimary", color.value);
+    await _setInt("customPrimary", color.toARGB32());
   }
 
   // VIEW
@@ -224,6 +273,13 @@ class AppSettingsProvider extends ChangeNotifier {
 
   Future<void> clearRecentlyPlayed() async {
     _recentlyPlayed.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList("recentlyPlayed", _recentlyPlayed);
+    notifyListeners();
+  }
+
+  Future<void> removeRecentlyPlayed(String path) async {
+    if (!_recentlyPlayed.remove(path)) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList("recentlyPlayed", _recentlyPlayed);
     notifyListeners();
@@ -354,13 +410,13 @@ class AppSettingsProvider extends ChangeNotifier {
   }
 
   Future<void> setSubtitleColor(Color color) async {
-    _subtitleColorValue = color.value;
-    await _setInt("subtitleColor", color.value);
+    _subtitleColorValue = color.toARGB32();
+    await _setInt("subtitleColor", color.toARGB32());
   }
 
   Future<void> setSubtitleBackgroundColor(Color color) async {
-    _subtitleBackgroundColorValue = color.value;
-    await _setInt("subtitleBackgroundColor", color.value);
+    _subtitleBackgroundColorValue = color.toARGB32();
+    await _setInt("subtitleBackgroundColor", color.toARGB32());
   }
 
   Future<void> setSubtitleEncoding(String encoding) async {

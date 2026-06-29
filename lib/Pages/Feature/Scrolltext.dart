@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+
 class AutoScrollText extends StatefulWidget {
   final String text;
   final TextStyle style;
@@ -57,7 +58,8 @@ class _AutoScrollTextState extends State<AutoScrollText> {
         }
         if (_scrollController.hasClients) {
           double maxScrollExtent = _scrollController.position.maxScrollExtent;
-          double nextOffset = _scrollController.offset + 50.0; // Scroll by 50 units
+          double nextOffset =
+              _scrollController.offset + 50.0; // Scroll by 50 units
 
           if (nextOffset > maxScrollExtent) {
             nextOffset = 0;
@@ -86,11 +88,10 @@ class _AutoScrollTextState extends State<AutoScrollText> {
             widget.text,
             style: widget.style,
           ),
-          SizedBox(width: _textWidth), // Add empty space to create a loop effect
+          SizedBox(
+              width: _textWidth), // Add empty space to create a loop effect
         ],
       ),
     );
   }
 }
-
-

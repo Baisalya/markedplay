@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../core/media_enums.dart';
+
 class MediaAppBarController extends ChangeNotifier {
   ViewMode viewMode = ViewMode.list;
   SortMode sortMode = SortMode.name;
 
   void toggleView() {
-    viewMode =
-    viewMode == ViewMode.list ? ViewMode.grid : ViewMode.list;
+    viewMode = viewMode == ViewMode.list ? ViewMode.grid : ViewMode.list;
     notifyListeners();
   }
 
@@ -16,8 +16,7 @@ class MediaAppBarController extends ChangeNotifier {
   }
 }
 
-class MediaAppBarWidget extends StatelessWidget
-    implements PreferredSizeWidget {
+class MediaAppBarWidget extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final MediaAppBarController controller;
 
@@ -35,9 +34,7 @@ class MediaAppBarWidget extends StatelessWidget
         // 🔄 Grid / List Toggle
         IconButton(
           icon: Icon(
-            controller.viewMode == ViewMode.list
-                ? Icons.grid_view
-                : Icons.list,
+            controller.viewMode == ViewMode.list ? Icons.grid_view : Icons.list,
           ),
           onPressed: controller.toggleView,
         ),

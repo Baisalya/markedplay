@@ -1,8 +1,6 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
-import 'package:flutter/services.dart';
 
 class CustomVideoPlayerController {
   late VideoPlayerController _controller;
@@ -25,7 +23,8 @@ class CustomVideoPlayerController {
 
   Future<void> _saveLastPlayedPosition() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('lastPlayedPosition_$filePath', _controller.value.position.inSeconds);
+    await prefs.setInt(
+        'lastPlayedPosition_$filePath', _controller.value.position.inSeconds);
   }
 
   Future<void> _loadLastPlayedPosition() async {

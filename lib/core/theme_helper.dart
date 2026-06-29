@@ -12,10 +12,55 @@ class ThemeHelper {
   static const double paddingMedium = 16.0;
   static const double paddingSmall = 8.0;
 
+  static ThemeData materialTheme(
+    Brightness brightness,
+    AppTheme appTheme, {
+    Color? customColor,
+  }) {
+    final seed = primary(appTheme, customColor: customColor);
+    final scheme = ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: brightness,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: background(appTheme, customColor: customColor),
+      visualDensity: VisualDensity.standard,
+      splashFactory: InkSparkle.splashFactory,
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        foregroundColor: textPrimary(appTheme),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: cardColor(appTheme, customColor: customColor),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusMedium),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: paddingMedium,
+          vertical: 14,
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusSmall),
+        ),
+      ),
+      sliderTheme: const SliderThemeData(trackHeight: 4),
+    );
+  }
+
   // ================= PRIMARY COLOR =================
 
-  static Color primary(AppTheme theme,
-      {Color? customColor}) {
+  static Color primary(AppTheme theme, {Color? customColor}) {
     switch (theme) {
       case AppTheme.neon:
         return Colors.cyanAccent;
@@ -33,10 +78,8 @@ class ThemeHelper {
 
   // ================= BACKGROUND COLOR =================
 
-  static Color background(AppTheme theme,
-      {Color? customColor}) {
+  static Color background(AppTheme theme, {Color? customColor}) {
     switch (theme) {
-
       case AppTheme.neon:
         return Colors.black;
 
@@ -47,17 +90,14 @@ class ThemeHelper {
         return const Color(0xFF121212);
 
       case AppTheme.custom:
-        return (customColor ?? Colors.blueAccent)
-            .withOpacity(0.08);
+        return (customColor ?? Colors.blueAccent).withOpacity(0.08);
     }
   }
 
   // ================= BACKGROUND GRADIENT =================
 
-  static Gradient backgroundGradient(AppTheme theme,
-      {Color? customColor}) {
+  static Gradient backgroundGradient(AppTheme theme, {Color? customColor}) {
     switch (theme) {
-
       case AppTheme.neon:
         return LinearGradient(
           colors: [
@@ -105,10 +145,8 @@ class ThemeHelper {
 
   // ================= CARD COLOR =================
 
-  static Color cardColor(AppTheme theme,
-      {Color? customColor}) {
+  static Color cardColor(AppTheme theme, {Color? customColor}) {
     switch (theme) {
-
       case AppTheme.neon:
         return Colors.white.withOpacity(0.05);
 
@@ -119,17 +157,14 @@ class ThemeHelper {
         return Colors.white.withOpacity(0.07);
 
       case AppTheme.custom:
-        return (customColor ?? Colors.blueAccent)
-            .withOpacity(0.15);
+        return (customColor ?? Colors.blueAccent).withOpacity(0.15);
     }
   }
 
   // ================= BORDER COLOR =================
 
-  static Color borderColor(AppTheme theme,
-      {Color? customColor}) {
+  static Color borderColor(AppTheme theme, {Color? customColor}) {
     switch (theme) {
-
       case AppTheme.neon:
         return Colors.cyan.withOpacity(0.4);
 
@@ -140,8 +175,7 @@ class ThemeHelper {
         return Colors.redAccent.withOpacity(0.4);
 
       case AppTheme.custom:
-        return (customColor ?? Colors.blueAccent)
-            .withOpacity(0.6);
+        return (customColor ?? Colors.blueAccent).withOpacity(0.6);
     }
   }
 
@@ -149,7 +183,6 @@ class ThemeHelper {
 
   static Color textPrimary(AppTheme theme) {
     switch (theme) {
-
       case AppTheme.neon:
         return Colors.white;
 
@@ -166,7 +199,6 @@ class ThemeHelper {
 
   static Color textSecondary(AppTheme theme) {
     switch (theme) {
-
       case AppTheme.neon:
         return Colors.white70;
 
@@ -183,22 +215,7 @@ class ThemeHelper {
 
   // ================= APPBAR COLOR =================
 
-  static Color appBarColor(AppTheme theme,
-      {Color? customColor}) {
-    switch (theme) {
-
-      case AppTheme.neon:
-        return Colors.black;
-
-      case AppTheme.minimal:
-        return Colors.white;
-
-      case AppTheme.cinematic:
-        return const Color(0xFF1A1A1A);
-
-      case AppTheme.custom:
-        return (customColor ?? Colors.blueAccent)
-            .withOpacity(0.2);
-    }
+  static Color appBarColor(AppTheme theme, {Color? customColor}) {
+    return Colors.transparent;
   }
 }

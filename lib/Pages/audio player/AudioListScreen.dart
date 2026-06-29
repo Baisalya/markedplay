@@ -23,29 +23,68 @@ class AudioListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<AppSettingsProvider>();
     final theme = settings.theme;
+    final textPrimary = ThemeHelper.textPrimary(theme);
+    final textSecondary = ThemeHelper.textSecondary(theme);
+    final audioProvider = context.watch<AudioPlayerProvider>();
 
     final sortedSongs = [...songs];
-    if (settings.sortMode == SortMode.name) {
-      sortedSongs.sort((a, b) => a.title.compareTo(b.title));
+    switch (settings.sortMode) {
+      case SortMode.name:
+        sortedSongs.sort(
+          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        );
+      case SortMode.date:
+        sortedSongs.sort(
+          (a, b) => (b.dateAdded ?? 0).compareTo(a.dateAdded ?? 0),
+        );
+      case SortMode.size:
+        sortedSongs.sort((a, b) => b.size.compareTo(a.size));
+      case SortMode.duration:
+        sortedSongs.sort(
+          (a, b) => (b.duration ?? 0).compareTo(a.duration ?? 0),
+        );
     }
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          albumName,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-            fontSize: 22,
-            letterSpacing: 1,
+      backgroundColor:
+          ThemeHelper.background(theme, customColor: settings.customPrimary),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(90),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+            child: GlassCard(
+              borderRadius: 20,
+              blur: 20,
+              color: Colors.transparent,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back_ios_new_rounded,
+                          color: textPrimary),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        albumName,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: textPrimary,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Stack(
         children: [
@@ -70,10 +109,22 @@ class AudioListScreen extends StatelessWidget {
                         itemCount: sortedSongs.length,
                         itemBuilder: (_, index) {
                           final song = sortedSongs[index];
-                          final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
                           return SongTile(
                             song: song,
-                            isPlaying: audioProvider.currentFilePath == song.data,
+                            isPlaying:
+                                audioProvider.currentFilePath == song.data,
+                            trailing: IconButton(
+                              tooltip: settings.favorites.contains(song.data)
+                                  ? 'Remove favorite'
+                                  : 'Add favorite',
+                              icon: Icon(
+                                settings.favorites.contains(song.data)
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                              ),
+                              onPressed: () =>
+                                  settings.toggleFavorite(song.data),
+                            ),
                             onTap: () {
                               audioProvider.updatePlaylist(sortedSongs);
                               Navigator.push(
@@ -81,7 +132,7 @@ class AudioListScreen extends StatelessWidget {
                                 MaterialPageRoute(
                                   builder: (_) => AudioPlayerScreen(
                                     filePath: song.data,
-                                    startPosition: audioProvider.currentPosition,
+                                    startPosition: Duration.zero,
                                   ),
                                 ),
                               );
@@ -91,7 +142,8 @@ class AudioListScreen extends StatelessWidget {
                       )
                     : GridView.builder(
                         padding: const EdgeInsets.all(20),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           crossAxisSpacing: 20,
                           mainAxisSpacing: 20,
@@ -100,7 +152,6 @@ class AudioListScreen extends StatelessWidget {
                         itemCount: sortedSongs.length,
                         itemBuilder: (_, index) {
                           final song = sortedSongs[index];
-                          final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
                           return GestureDetector(
                             onTap: () {
                               audioProvider.updatePlaylist(sortedSongs);
@@ -109,7 +160,7 @@ class AudioListScreen extends StatelessWidget {
                                 MaterialPageRoute(
                                   builder: (_) => AudioPlayerScreen(
                                     filePath: song.data,
-                                    startPosition: audioProvider.currentPosition,
+                                    startPosition: Duration.zero,
                                   ),
                                 ),
                               );
@@ -127,28 +178,51 @@ class AudioListScreen extends StatelessWidget {
                                     ),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                    padding:
+                                        const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                                    child: Row(
                                       children: [
-                                        Text(
-                                          song.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                song.title,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: textPrimary,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                song.artist ?? "Unknown Artist",
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: textSecondary,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          song.artist ?? "Unknown Artist",
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: Colors.white54,
-                                            fontSize: 11,
+                                        IconButton(
+                                          tooltip: settings.favorites
+                                                  .contains(song.data)
+                                              ? 'Remove favorite'
+                                              : 'Add favorite',
+                                          icon: Icon(
+                                            settings.favorites
+                                                    .contains(song.data)
+                                                ? Icons.favorite_rounded
+                                                : Icons.favorite_border_rounded,
+                                            size: 20,
                                           ),
+                                          onPressed: () => settings
+                                              .toggleFavorite(song.data),
                                         ),
                                       ],
                                     ),

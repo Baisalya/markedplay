@@ -1,7 +1,7 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
@@ -14,13 +14,16 @@ class ThumbnailService {
 
   Database? _db;
   String? _cacheDir;
-  
+  bool _initialized = false;
+
   final List<String> _queue = [];
   final Map<String, Completer<String?>> _completers = {};
   bool _isProcessing = false;
 
   Future<void> init() async {
-    if (_db != null) return;
+    if (_initialized) return;
+    _initialized = true;
+    if (kIsWeb || Platform.isWindows || Platform.isLinux) return;
     final directory = await getTemporaryDirectory();
     _cacheDir = p.join(directory.path, 'video_thumbnails');
     await Directory(_cacheDir!).create(recursive: true);
@@ -38,10 +41,11 @@ class ThumbnailService {
   /// Clears all stored thumbnails from DB and Disk
   Future<void> clearAll() async {
     await init();
+    if (_db == null) return;
     try {
       // Clear DB
       await _db!.delete('thumbnails');
-      
+
       // Clear Disk
       if (_cacheDir != null) {
         final dir = Directory(_cacheDir!);
@@ -52,15 +56,16 @@ class ThumbnailService {
           }
         }
       }
-      print("Thumbnail cache cleared successfully");
+      debugPrint("Thumbnail cache cleared successfully");
     } catch (e) {
-      print("Error clearing thumbnail cache: $e");
+      debugPrint("Error clearing thumbnail cache: $e");
     }
   }
 
   Future<String?> getThumbnail(String videoPath) async {
     await init();
-    
+    if (_db == null) return null;
+
     final List<Map<String, dynamic>> maps = await _db!.query(
       'thumbnails',
       where: 'video_path = ?',
@@ -79,7 +84,7 @@ class ThumbnailService {
     final completer = Completer<String?>();
     _completers[videoPath] = completer;
     _queue.add(videoPath);
-    
+
     _processQueue();
     return completer.future;
   }
@@ -101,7 +106,7 @@ class ThumbnailService {
     // Professional Jumps: Deep points first, then shallower, then start.
     // Sequential try-catch ensures short videos don't fail the whole process.
     final List<int> timestamps = [2000, 10000, 30000, 60000, 1000, 0];
-    
+
     Uint8List? bestBytes;
     double highestScore = -1.0;
 
@@ -117,7 +122,7 @@ class ThumbnailService {
 
         if (bytes != null && bytes.isNotEmpty) {
           double score = await _calculateFrameScore(bytes);
-          
+
           // FAST PASS: If score is high (bright + detailed), take it and stop.
           if (score > 40.0) {
             bestBytes = bytes;
@@ -150,7 +155,7 @@ class ThumbnailService {
         );
         return thumbFile.path;
       } catch (e) {
-        print("Save failed: $e");
+        debugPrint("Save failed: $e");
       }
     }
     return null;
@@ -158,10 +163,12 @@ class ThumbnailService {
 
   Future<double> _calculateFrameScore(Uint8List data) async {
     try {
-      final ui.Codec codec = await ui.instantiateImageCodec(data, targetWidth: 32, targetHeight: 32);
+      final ui.Codec codec = await ui.instantiateImageCodec(data,
+          targetWidth: 32, targetHeight: 32);
       final ui.FrameInfo fi = await codec.getNextFrame();
       final ui.Image image = fi.image;
-      final ByteData? bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final ByteData? bytes =
+          await image.toByteData(format: ui.ImageByteFormat.rawRgba);
       image.dispose();
       if (bytes == null) return 0.0;
 
@@ -170,7 +177,8 @@ class ThumbnailService {
       List<double> lums = [];
 
       for (int i = 0; i < buffer.length; i += 16) {
-        double lum = (0.299 * buffer[i] + 0.587 * buffer[i+1] + 0.114 * buffer[i+2]);
+        double lum =
+            (0.299 * buffer[i] + 0.587 * buffer[i + 1] + 0.114 * buffer[i + 2]);
         lums.add(lum);
         sum += lum;
       }
@@ -180,9 +188,11 @@ class ThumbnailService {
       for (double l in lums) {
         variance += (l - avg).abs();
       }
-      
+
       // Professional Score: Variance (Detail) + slight weighting for brightness
       return (variance / lums.length) * 1.5 + (avg * 0.1);
-    } catch (_) { return 0.0; }
+    } catch (_) {
+      return 0.0;
+    }
   }
 }

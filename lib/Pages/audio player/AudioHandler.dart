@@ -4,14 +4,21 @@ import 'package:just_audio/just_audio.dart';
 
 class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   final _player = AudioPlayer();
-  static final _notificationClickController = StreamController<bool>.broadcast();
-  static Stream<bool> get notificationClickStream => _notificationClickController.stream;
+  Future<void> Function()? _onAudioSkipToNext;
+  Future<void> Function()? _onAudioSkipToPrevious;
+  Future<void> Function()? _onVideoSkipToNext;
+  Future<void> Function()? _onVideoSkipToPrevious;
+  Duration _seekStep = const Duration(seconds: 10);
+  static final _notificationClickController =
+      StreamController<bool>.broadcast();
+  static Stream<bool> get notificationClickStream =>
+      _notificationClickController.stream;
 
   MyAudioHandler() {
     _player.playbackEventStream.map(_transformEvent).listen((state) {
       playbackState.add(state);
     });
-    
+
     _player.durationStream.listen((duration) {
       if (duration != null && mediaItem.value != null) {
         mediaItem.add(mediaItem.value!.copyWith(duration: duration));
@@ -37,23 +44,76 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
+  Future<void> fastForward() {
+    final duration = _player.duration;
+    var target = _player.position + _seekStep;
+    if (duration != null && target > duration) target = duration;
+    return seek(target);
+  }
+
+  @override
+  Future<void> rewind() {
+    var target = _player.position - _seekStep;
+    if (target < Duration.zero) target = Duration.zero;
+    return seek(target);
+  }
+
+  @override
+  Future<void> skipToNext() async {
+    if (mediaItem.value?.extras?['type'] == 'video') {
+      await _onVideoSkipToNext?.call();
+    } else {
+      await _onAudioSkipToNext?.call();
+    }
+  }
+
+  @override
+  Future<void> skipToPrevious() async {
+    if (mediaItem.value?.extras?['type'] == 'video') {
+      await _onVideoSkipToPrevious?.call();
+    } else {
+      await _onAudioSkipToPrevious?.call();
+    }
+  }
+
+  @override
   Future<void> stop() async {
     await _player.stop();
     return super.stop();
   }
 
   Future<void> setAudioSource(String filePath, MediaItem item) async {
-    mediaItem.add(item);
     await _player.setFilePath(filePath);
+    mediaItem.add(item.copyWith(duration: _player.duration ?? item.duration));
+  }
+
+  @override
+  Future<void> setSpeed(double speed) => _player.setSpeed(speed);
+
+  void configureControls({
+    Future<void> Function()? onSkipToNext,
+    Future<void> Function()? onSkipToPrevious,
+    Duration? seekStep,
+  }) {
+    _onAudioSkipToNext = onSkipToNext;
+    _onAudioSkipToPrevious = onSkipToPrevious;
+    if (seekStep != null) _seekStep = seekStep;
+  }
+
+  void configureVideoControls({
+    Future<void> Function()? onSkipToNext,
+    Future<void> Function()? onSkipToPrevious,
+  }) {
+    _onVideoSkipToNext = onSkipToNext;
+    _onVideoSkipToPrevious = onSkipToPrevious;
   }
 
   PlaybackState _transformEvent(PlaybackEvent event) {
     return PlaybackState(
       controls: [
-        MediaControl.rewind,
+        MediaControl.skipToPrevious,
         if (_player.playing) MediaControl.pause else MediaControl.play,
-        MediaControl.fastForward,
-        MediaControl.stop,
+        MediaControl.skipToNext,
       ],
       systemActions: const {
         MediaAction.seek,
@@ -62,12 +122,13 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
       },
       androidCompactActionIndices: const [0, 1, 2],
       processingState: const {
-        ProcessingState.idle: AudioProcessingState.idle,
-        ProcessingState.loading: AudioProcessingState.loading,
-        ProcessingState.buffering: AudioProcessingState.buffering,
-        ProcessingState.ready: AudioProcessingState.ready,
-        ProcessingState.completed: AudioProcessingState.completed,
-      }[_player.processingState] ?? AudioProcessingState.idle,
+            ProcessingState.idle: AudioProcessingState.idle,
+            ProcessingState.loading: AudioProcessingState.loading,
+            ProcessingState.buffering: AudioProcessingState.buffering,
+            ProcessingState.ready: AudioProcessingState.ready,
+            ProcessingState.completed: AudioProcessingState.completed,
+          }[_player.processingState] ??
+          AudioProcessingState.idle,
       playing: _player.playing,
       updatePosition: _player.position,
       bufferedPosition: _player.bufferedPosition,

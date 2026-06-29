@@ -1,7 +1,7 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:markedplay/widgets/modern_widgets.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 
@@ -10,6 +10,43 @@ import '../../core/media_enums.dart';
 import '../../core/theme_helper.dart';
 import '../../widgets/local_video_thumbnail.dart';
 import 'Videoplayer.dart';
+
+class _ResolvedVideoPlaylist {
+  final List<String> paths;
+  final int initialIndex;
+
+  const _ResolvedVideoPlaylist(this.paths, this.initialIndex);
+}
+
+Future<_ResolvedVideoPlaylist> _resolvePlaylistWindow(
+  List<AssetEntity> assets,
+  int targetIndex,
+) async {
+  const windowRadius = 100;
+  final start = assets.length <= windowRadius * 2 + 1
+      ? 0
+      : (targetIndex - windowRadius)
+          .clamp(
+            0,
+            assets.length - (windowRadius * 2 + 1),
+          )
+          .toInt();
+  final end = assets.length <= windowRadius * 2 + 1
+      ? assets.length
+      : start + windowRadius * 2 + 1;
+  final window = assets.sublist(start, end);
+  final files = await Future.wait(window.map((asset) => asset.file));
+  final targetId = assets[targetIndex].id;
+  final paths = <String>[];
+  var resolvedTargetIndex = -1;
+  for (var index = 0; index < files.length; index++) {
+    final file = files[index];
+    if (file == null) continue;
+    if (window[index].id == targetId) resolvedTargetIndex = paths.length;
+    paths.add(file.path);
+  }
+  return _ResolvedVideoPlaylist(paths, resolvedTargetIndex);
+}
 
 class VideoListScreen extends StatelessWidget {
   final String folderName;
@@ -23,65 +60,107 @@ class VideoListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     final settings = context.watch<AppSettingsProvider>();
     final theme = settings.theme;
-
-    final primaryColor = ThemeHelper.primary(
-      theme,
-      customColor: settings.customPrimary,
-    );
 
     final backgroundColor = ThemeHelper.background(
       theme,
       customColor: settings.customPrimary,
     );
+    final textPrimary = ThemeHelper.textPrimary(theme);
 
     final sortedVideos = [...videos];
 
     // 🔥 Global Sorting
-    if (settings.sortMode == SortMode.name) {
-      sortedVideos.sort(
-            (a, b) => (a.title ?? "")
-            .compareTo(b.title ?? ""),
-      );
+    switch (settings.sortMode) {
+      case SortMode.name:
+        sortedVideos.sort(
+          (a, b) => (a.title ?? '')
+              .toLowerCase()
+              .compareTo((b.title ?? '').toLowerCase()),
+        );
+      case SortMode.date:
+        sortedVideos.sort(
+          (a, b) => b.createDateTime.compareTo(a.createDateTime),
+        );
+      case SortMode.duration:
+        sortedVideos.sort((a, b) => b.duration.compareTo(a.duration));
+      case SortMode.size:
+        sortedVideos.sort(
+          (a, b) => (b.width * b.height).compareTo(a.width * a.height),
+        );
     }
 
     return Scaffold(
       backgroundColor: backgroundColor,
-
-      appBar: AppBar(
-        backgroundColor: ThemeHelper.appBarColor(
-          theme,
-          customColor: settings.customPrimary,
-        ),
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          folderName,
-          style: TextStyle(
-            color: primaryColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+      extendBodyBehindAppBar: true,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(90),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+            child: GlassCard(
+              borderRadius: 20,
+              blur: 20,
+              color: Colors.transparent,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back_ios_new_rounded,
+                          color: textPrimary),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        folderName,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: textPrimary,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
-        iconTheme: IconThemeData(
-          color: primaryColor,
-        ),
       ),
-
-      body: settings.viewMode == ViewMode.list
-          ? _buildListView(
-        context,
-        sortedVideos,
-        theme,
-        settings,
-      )
-          : _buildGridView(
-        context,
-        sortedVideos,
-        theme,
-        settings,
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: ThemeHelper.backgroundGradient(theme,
+                  customColor: settings.customPrimary),
+            ),
+          ),
+          SafeArea(
+            child: sortedVideos.isEmpty
+                ? const EmptyStateWidget(
+                    icon: Icons.video_library_outlined,
+                    title: 'No videos in this folder',
+                    subtitle: 'Pull down on the library screen to scan again.',
+                  )
+                : settings.viewMode == ViewMode.list
+                    ? _buildListView(
+                        context,
+                        sortedVideos,
+                        theme,
+                        settings,
+                      )
+                    : _buildGridView(
+                        context,
+                        sortedVideos,
+                        theme,
+                        settings,
+                      ),
+          ),
+        ],
       ),
     );
   }
@@ -121,10 +200,11 @@ class VideoListScreen extends StatelessWidget {
   ) {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 280,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
+        childAspectRatio: 1.05,
       ),
       itemCount: videos.length,
       itemBuilder: (_, index) {
@@ -231,24 +311,34 @@ class _VideoListItemState extends State<_VideoListItem> {
                 color: ThemeHelper.textPrimary(widget.theme),
               ),
             ),
+            trailing: IconButton(
+              tooltip: widget.settings.favorites.contains(file?.path)
+                  ? 'Remove favorite'
+                  : 'Add favorite',
+              icon: Icon(
+                widget.settings.favorites.contains(file?.path)
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
+              ),
+              onPressed: file == null
+                  ? null
+                  : () => widget.settings.toggleFavorite(file.path),
+            ),
             onTap: file == null
                 ? null
                 : () async {
-                    final playlistFiles = await Future.wait(
-                      widget.playlist.map((e) => e.file),
+                    final resolved = await _resolvePlaylistWindow(
+                      widget.playlist,
+                      widget.initialIndex,
                     );
-                    final validPlaylist = playlistFiles
-                        .where((f) => f != null)
-                        .map((f) => f!.path)
-                        .toList();
 
-                    if (context.mounted) {
+                    if (context.mounted && resolved.initialIndex >= 0) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => VideoPlayerScreen(
-                            playlist: validPlaylist,
-                            initialIndex: widget.initialIndex,
+                            playlist: resolved.paths,
+                            initialIndex: resolved.initialIndex,
                           ),
                         ),
                       );
@@ -309,21 +399,18 @@ class _VideoGridItemState extends State<_VideoGridItem> {
           onTap: file == null
               ? null
               : () async {
-                  final playlistFiles = await Future.wait(
-                    widget.playlist.map((e) => e.file),
+                  final resolved = await _resolvePlaylistWindow(
+                    widget.playlist,
+                    widget.initialIndex,
                   );
-                  final validPlaylist = playlistFiles
-                      .where((f) => f != null)
-                      .map((f) => f!.path)
-                      .toList();
 
-                  if (context.mounted) {
+                  if (context.mounted && resolved.initialIndex >= 0) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => VideoPlayerScreen(
-                          playlist: validPlaylist,
-                          initialIndex: widget.initialIndex,
+                          playlist: resolved.paths,
+                          initialIndex: resolved.initialIndex,
                         ),
                       ),
                     );
@@ -366,14 +453,34 @@ class _VideoGridItemState extends State<_VideoGridItem> {
                       : LocalVideoThumbnail(path: file.path),
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Text(
-                    widget.video.title ?? "Video",
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: ThemeHelper.textPrimary(widget.theme),
-                    ),
+                  padding: const EdgeInsets.fromLTRB(10, 2, 2, 2),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.video.title ?? "Video",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: ThemeHelper.textPrimary(widget.theme),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: widget.settings.favorites.contains(file?.path)
+                            ? 'Remove favorite'
+                            : 'Add favorite',
+                        icon: Icon(
+                          widget.settings.favorites.contains(file?.path)
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          size: 20,
+                        ),
+                        onPressed: file == null
+                            ? null
+                            : () => widget.settings.toggleFavorite(file.path),
+                      ),
+                    ],
                   ),
                 ),
               ],
